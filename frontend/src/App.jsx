@@ -4,7 +4,7 @@ import { Chess } from 'chess.js'
 
 // ← Replace this with your Railway URL after deploy (Step 17)
 const API_URL = 'https://chess-bot-production-efa2.up.railway.app'
-const WS_URL  = 'wss://chess-bot-production-efa2.up.railway.app
+const WS_URL  = 'wss://chess-bot-production-efa2.up.railway.app'
 export default function App() {
   const [game]        = useState(new Chess())
   const [fen, setFen] = useState('start')
