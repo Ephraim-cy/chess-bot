@@ -119,21 +119,34 @@ export default function App() {
     else setStatus('You lost.')
   }
 
-  function onDrop(from, to) {
-    if (!myTurn || result) return false
-    const game = gameRef.current
-    const moves = game.moves({ square: from, verbose: true })
-    const mv = moves.find(m => m.to === to)
-    if (!mv) return false
-    const promo = mv.flags.includes('p') ? 'q' : undefined
-    const r = game.move({ from, to, promotion: promo })
-    if (!r) return false
-    setFen(game.fen())
-    setMyTurn(false)
-    setStatus('Opponent thinking...')
-    wsRef.current.send(JSON.stringify({ type: 'move', move: from + to + (promo || '') }))
-    return true
+ function onDrop(from, to) {
+  const game = gameRef.current
+
+  // Try the move
+  let move = null
+  try {
+    move = game.move({ from, to, promotion: 'q' })
+  } catch (e) {
+    return false
   }
+
+  if (!move) return false
+
+  // Update board visually
+  setFen(game.fen())
+  setStatus('Opponent thinking...')
+  setMyTurn(false)
+
+  // Send to server
+  if (wsRef.current && wsRef.current.readyState === 1) {
+    wsRef.current.send(JSON.stringify({
+      type: 'move',
+      move: from + to + (move.promotion || '')
+    }))
+  }
+
+  return true
+}
 
   function reset() {
     if (wsRef.current) wsRef.current.close()
@@ -289,14 +302,19 @@ export default function App() {
       </div>
 
       <div style={{ width: 'min(460px, calc(100vw - 20px))' }}>
-        <Chessboard
-          position={fen}
-          onPieceDrop={onDrop}
-          boardOrientation={color === 'black' ? 'black' : 'white'}
-          arePiecesDraggable={myTurn && !result}
-          customDarkSquareStyle={{ backgroundColor: '#B06000' }}
-          customLightSquareStyle={{ backgroundColor: '#F0C070' }}
-        />
+       <Chessboard
+  position={fen}
+  onPieceDrop={onDrop}
+  boardOrientation={color === 'black' ? 'black' : 'white'}
+  arePiecesDraggable={true}
+  animationDuration={200}
+  customBoardStyle={{
+    borderRadius: '8px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+  }}
+  customDarkSquareStyle={{ backgroundColor: '#B06000' }}
+  customLightSquareStyle={{ backgroundColor: '#F0C070' }}
+/>
       </div>
 
       <div style={{ color: '#6B7280', fontSize: '0.8rem' }}>
