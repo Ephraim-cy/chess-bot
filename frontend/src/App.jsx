@@ -191,7 +191,7 @@ async function createMatch() {
     setMsg('Creating match...','purple')
     try {
       const stakeNum = parseFloat(stake) || 5
-      const res = await fetch(${API}/api/match/create, {
+      const res = await fetch(`${API}/api/match/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
