@@ -87,8 +87,15 @@ export default function App() {
       const msg = JSON.parse(event.data)
 
       if (msg.type === 'connected' || msg.type === 'state') {
-        gameRef.current.load(msg.fen)
-        setFen(msg.fen)
+  if (msg.turn === clr) {
+    // Only update from server when it becomes OUR turn
+    // (meaning opponent just moved)
+    gameRef.current.load(msg.fen)
+    setFen(msg.fen)
+  } else if (msg.type === 'connected') {
+    gameRef.current.load(msg.fen)
+    setFen(msg.fen)
+  }
         setMyTurn(!msg.game_over && msg.turn === clr)
         if (screen !== 'game') setScreen('game')
 
