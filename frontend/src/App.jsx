@@ -121,21 +121,27 @@ export default function App() {
 
  function onDrop(from, to) {
   const game = gameRef.current
-
-  // Try the move
-  let move = null
+  
   try {
-    move = game.move({ from, to, promotion: 'q' })
+    const move = game.move({ from, to, promotion: 'q' })
+    if (!move) return false
+    
+    const newFen = game.fen()
+    setFen(newFen)
+    setMyTurn(false)
+    setStatus('Opponent thinking...')
+    
+    if (wsRef.current && wsRef.current.readyState === 1) {
+      wsRef.current.send(JSON.stringify({
+        type: 'move',
+        move: from + to + (move.promotion || '')
+      }))
+    }
+    return true
   } catch (e) {
     return false
   }
-
-  if (!move) return false
-
-  // Update board visually
-  setFen(game.fen())
-  setStatus('Opponent thinking...')
-  setMyTurn(false)
+}
 
   // Send to server
   if (wsRef.current && wsRef.current.readyState === 1) {
