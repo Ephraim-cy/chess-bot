@@ -186,23 +186,31 @@ export default function App() {
 
   function setMsg(text,type='info') { setStatus(text); setStatusType(type) }
 
-  async function createMatch() {
-    setLoading(true); setMsg('Creating match...','purple')
+async function createMatch() {
+    setLoading(true)
+    setMsg('Creating match...','purple')
     try {
-      const res = await fetch(`${API}/api/match/create`, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', 'x-init-data':initData },
-        body:JSON.stringify({ stake:parseFloat(stake)||5 })
+      const stakeNum = parseFloat(stake) || 5
+      const res = await fetch(${API}/api/match/create, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-init-data': initData || 'test'
+        },
+        body: JSON.stringify({ stake: stakeNum })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.detail||'Failed')
-      setMatchId(data.match_id); setColor('white'); setScreen('lobby')
-      setMsg('Waiting for opponent...','purple')
-      connectWS(data.match_id,'white')
-    } catch(e) { setMsg('❌ '+e.message,'danger') }
-    finally { setLoading(false) }
+      if (!res.ok) throw new Error(JSON.stringify(data))
+      setMatchId(data.match_id)
+      setColor('white')
+      setScreen('lobby')
+      connectWS(data.match_id, 'white')
+    } catch(e) {
+      setMsg('ERROR: ' + e.message, 'danger')
+      alert('Error: ' + e.message)
+    } finally { setLoading(false) }
   }
-
+  
   async function joinMatch() {
     if (!joinId.trim()) { setMsg('Paste a match ID first','warning'); return }
     setLoading(true); setMsg('Joining...','blue')

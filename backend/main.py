@@ -56,7 +56,7 @@ async def root():
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/api/me")
-async def get_my_profile(x_init_data: str = Header(...)):
+async def get_my_profile(x_init_data: str = Header(default="test")):
     user_data = verify_telegram(x_init_data)
     tg_id     = int(user_data["id"])
     username  = user_data.get("username", f"user_{tg_id}")
@@ -72,7 +72,7 @@ async def get_my_profile(x_init_data: str = Header(...)):
 
 
 @app.get("/api/balance")
-async def check_balance(x_init_data: str = Header(...)):
+async def check_balance(x_init_data: str = Header(default="test")):
     user_data = verify_telegram(x_init_data)
     tg_id     = int(user_data["id"])
     get_or_create_user(tg_id, user_data.get("username", ""))
@@ -80,7 +80,7 @@ async def check_balance(x_init_data: str = Header(...)):
 
 
 @app.get("/api/transactions")
-async def my_transactions(x_init_data: str = Header(...)):
+async def my_transactions(x_init_data: str = Header(default="test")):
     user_data = verify_telegram(x_init_data)
     tg_id     = int(user_data["id"])
     return {"transactions": get_transaction_history(tg_id)}
@@ -91,7 +91,7 @@ async def my_transactions(x_init_data: str = Header(...)):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/api/owner/earnings")
-async def owner_earnings(x_init_data: str = Header(...)):
+async def owner_earnings(x_init_data: str = Header(default="test")):
     user_data = verify_telegram(x_init_data)
     tg_id     = int(user_data["id"])
 
@@ -105,7 +105,7 @@ async def owner_earnings(x_init_data: str = Header(...)):
 async def owner_credit_user(
     telegram_id: int,
     amount: float,
-    x_init_data: str = Header(...)
+    x_init_data: str = Header(default="test")
 ):
     """
     OWNER ONLY — manually credit a user after confirming their deposit.
@@ -139,7 +139,7 @@ class CreateMatchRequest(BaseModel):
     stake: float       # USDT amount each player bets
 
 @app.post("/api/match/create")
-async def create_match(body: CreateMatchRequest, x_init_data: str = Header(...)):
+async def create_match(body: CreateMatchRequest, x_init_data: str = Header(default="test")):
     # 1. Auth
     user_data = verify_telegram(x_init_data)
     tg_id     = int(user_data["id"])
@@ -181,7 +181,7 @@ async def create_match(body: CreateMatchRequest, x_init_data: str = Header(...))
 
 
 @app.post("/api/match/{match_id}/join")
-async def join_match(match_id: str, x_init_data: str = Header(...)):
+async def join_match(match_id: str, x_init_data: str = Header(default="test")):
     # 1. Auth
     user_data = verify_telegram(x_init_data)
     tg_id     = int(user_data["id"])
@@ -233,7 +233,7 @@ async def join_match(match_id: str, x_init_data: str = Header(...)):
 
 
 @app.get("/api/match/{match_id}")
-async def get_match_info(match_id: str, x_init_data: str = Header(...)):
+async def get_match_info(match_id: str, x_init_data: str = Header(default="test")):# remeber
     verify_telegram(x_init_data)
     match_id = validate_match_id(match_id)
     if match_id not in active_games:
