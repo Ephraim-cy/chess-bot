@@ -143,17 +143,6 @@ export default function App() {
   }
 }
 
-  // Send to server
-  if (wsRef.current && wsRef.current.readyState === 1) {
-    wsRef.current.send(JSON.stringify({
-      type: 'move',
-      move: from + to + (move.promotion || '')
-    }))
-  }
-
-  return true
-}
-
   function reset() {
     if (wsRef.current) wsRef.current.close()
     gameRef.current = new Chess()
@@ -308,7 +297,7 @@ export default function App() {
       </div>
 
       <div style={{ width: 'min(460px, calc(100vw - 20px))' }}>
-       <Chessboard
+   <Chessboard
   position={fen}
   onPieceDrop={onDrop}
   boardOrientation={color === 'black' ? 'black' : 'white'}
