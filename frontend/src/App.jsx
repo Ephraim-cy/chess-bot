@@ -19,8 +19,8 @@ import { useState, useEffect, useRef } from 'react'
 import { Chessboard } from 'react-chessboard'
 import { Chess } from 'chess.js'
 
-const API = 'https://chess-bot-production-392c.up.railway.app'
-const WSS = 'wss://chess-bot-production-392c.up.railway.app'
+const API = 'https://chess-bot-production-efa2.up.railway.app'
+const WSS = 'wss://chess-bot-production-efa2.up.railway.app'
 
 const tg = window.Telegram?.WebApp
 const initData = tg?.initData || 'test'
