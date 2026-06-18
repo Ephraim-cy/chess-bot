@@ -10,7 +10,7 @@ const tgUser = tg?.initDataUnsafe?.user || { id: 0, username: 'Player' }
 
 export default function App() {
   const [screen, setScreen]   = useState('home')
-  const [fen, setFen]         = useState('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')
+  const [fen, setFen]         = useState('start')
   const [status, setStatus]   = useState('')
   const [color, setColor]     = useState(null)
   const [matchId, setMatchId] = useState('')
@@ -20,7 +20,7 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [myTurnUI, setMyTurnUI] = useState(false)
 
-  const chessRef    = useRef(new Chess('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'))
+  const chessRef    = useRef(new Chess())
   const wsRef       = useRef(null)
   const colorRef    = useRef(null)
   const waitingRef  = useRef(false)
@@ -70,7 +70,6 @@ export default function App() {
   }
 
   function connect(mid, clr) {
-    colorRef.current = clr
     const sock = new WebSocket(WSS + '/ws/' + mid + '/' + clr)
     wsRef.current = sock
 
@@ -80,37 +79,39 @@ export default function App() {
 
     sock.onmessage = (evt) => {
       const msg = JSON.parse(evt.data)
+      const myClr = colorRef.current
 
       if (msg.type === 'connected') {
-        chessRef.current = new Chess(msg.fen)
+        const game = new Chess(msg.fen)
+        chessRef.current = game
         setFen(msg.fen)
         setScreen('game')
-        
-        // Robust turn normalizer supporting both format variants ('w' vs 'white')
-        const mine = msg.turn === clr || msg.turn === (clr === 'white' ? 'w' : 'b')
+        const mine = msg.turn === myClr
         setMyTurnUI(mine)
         setStatus(mine ? '⚡ Your turn!' : '⏳ Waiting for opponent...')
         waitingRef.current = false
       }
 
       if (msg.type === 'state') {
-        waitingRef.current = false 
-
-        chessRef.current = new Chess(msg.fen)
+        // FIXED: Always synchronize local layout and engine state with the server authoritative FEN
+        // This fixes the desynchronization bug when handling confirmation and fast bot moves.
+        waitingRef.current = false
+        const game = new Chess(msg.fen)
+        chessRef.current = game
         setFen(msg.fen)
-
-        const mine = msg.turn === clr || msg.turn === (clr === 'white' ? 'w' : 'b')
+        
+        const mine = msg.turn === myClr
         setMyTurnUI(mine)
-
+        
         if (msg.game_over && msg.result) {
-          endGame({ winner: msg.result.winner, reason: msg.result.reason }, clr)
+          endGame(msg.result, myClr)
         } else {
           setStatus(mine ? '⚡ Your turn!' : '⏳ Opponent thinking...')
         }
       }
 
       if (msg.type === 'gameover') {
-        endGame(msg, clr)
+        endGame(msg, colorRef.current)
       }
     }
 
@@ -126,57 +127,48 @@ export default function App() {
     else setStatus('💀 You lost.')
   }
 
-  // FIXED: 100% Closure-Insulated Input Event Handler
   function onDrop(from, to) {
-    const game = chessRef.current;
-    if (!game) return false;
+    // FIXED: Turn guard clause added to prevent interaction when it is not your turn
+    if (!myTurnUI || result) return false
 
-    // 1. Bypass state snapshot: Ask engine directly if game is over
-    if (game.isGameOver()) {
-      console.log("⛔ Move rejected: Game is over.");
-      return false;
-    }
+    const game = chessRef.current
+    
+    // FIXED: Dynamically check for pawn promotions instead of forcing it on every move
+    const piece = game.get(from)
+    const isPawn = piece && piece.type === 'p'
+    const isPromotionRank = (piece?.color === 'w' && to.endsWith('8')) || (piece?.color === 'b' && to.endsWith('1'))
+    const isPromotion = isPawn && isPromotionRank
 
-    // 2. Bypass myTurnUI state closure: Ask engine directly whose turn it is
-    const engineTurn = game.turn(); // Returns 'w' or 'b'
-    const playerColor = colorRef.current; // Returns 'white' or 'black'
-    const expectedTurnCode = playerColor === 'white' ? 'w' : 'b';
-
-    if (engineTurn !== expectedTurnCode) {
-      console.log(`⛔ Snapback: Not your turn. Engine expects: ${engineTurn}, Ref contains: ${playerColor}`);
-      return false;
-    }
-
+    let move
     try {
-      // 3. Process move validation inside local engine
-      const move = game.move({ from, to, promotion: 'q' });
-      
-      if (!move) {
-        console.log("⛔ Snapback: chess.js flagged move as illegal.");
-        return false;
-      }
-
-      console.log("✅ Move successfully executed:", move);
-      
-      // 4. Synchronously batch updates to avoid rendering frame gaps
-      setFen(game.fen());
-      setMyTurnUI(false);
-      setStatus('⏳ Opponent thinking...');
-      waitingRef.current = true;
-
-      // 5. Send out via streaming socket channel
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: 'move',
-          move: from + to + (move.promotion || '')
-        }));
-      }
-
-      return true;
-    } catch (error) {
-      console.error("💥 Local execution check error:", error);
-      return false;
+      move = game.move({ 
+        from, 
+        to, 
+        ...(isPromotion && { promotion: 'q' }) 
+      })
+    } catch (e) {
+      return false
     }
+
+    // chess.js rejected the move (illegal)
+    if (!move) return false
+
+    // Move is legal — update board immediately (piece stays!)
+    const newFen = game.fen()
+    setFen(newFen)
+    setMyTurnUI(false)
+    setStatus('⏳ Opponent thinking...')
+    waitingRef.current = true
+
+    // Send to server
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'move',
+        move: from + to + (move.promotion || '')
+      }))
+    }
+
+    return true
   }
 
   function reset() {
@@ -186,7 +178,7 @@ export default function App() {
     colorRef.current = null
     waitingRef.current = false
     setScreen('home')
-    setFen('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')
+    setFen('start')
     setMyTurnUI(false)
     setColor(null)
     setResult(null)
@@ -226,7 +218,7 @@ export default function App() {
     })
   }
 
-  // HOME SCREEN
+  // HOME
   if (screen === 'home') return (
     <div style={S.page}>
       <div style={{ fontSize: 52 }}>♟</div>
@@ -292,7 +284,7 @@ export default function App() {
     </div>
   )
 
-  // LOBBY SCREEN
+  // LOBBY
   if (screen === 'lobby') return (
     <div style={S.page}>
       <div style={{ fontSize: 52 }}>⚔️</div>
@@ -316,7 +308,7 @@ export default function App() {
     </div>
   )
 
-  // GAME SCREEN
+  // GAME
   return (
     <div style={{ ...S.page, padding: '10px 10px 28px', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: 460 }}>
