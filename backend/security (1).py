@@ -2,6 +2,20 @@
 """
 Every incoming request passes through this file first.
 Nothing touches money until auth + rate-limit + validation all pass.
+
+╔══════════════════════════════════════════════════════════════════════╗
+║  ⚠️  DEV-MODE AUTH BYPASS IS CURRENTLY ACTIVE  ⚠️                      ║
+║                                                                        ║
+║  verify_telegram() below returns a HARDCODED fake user for EVERY      ║
+║  request. Real Telegram signature verification is NOT running.        ║
+║                                                                        ║
+║  This is intentional ONLY while balances are simulated/play-money.    ║
+║  Before ANY real funds (USDT/TON/Stars) touch this backend, you MUST: ║
+║    1. Delete the early `return {...}` line below                      ║
+║    2. Confirm TELEGRAM_BOT_TOKEN is set in your environment           ║
+║    3. Test with real Telegram initData (not the "test" string)       ║
+║    4. Remove the 'x-init-data: test' header from the frontend         ║
+╚══════════════════════════════════════════════════════════════════════╝
 """
 
 import hashlib, hmac, time, json, os
@@ -20,13 +34,14 @@ BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 #  your bot token.
 # ─────────────────────────────────────────────────────
 def verify_telegram(init_data: str) -> dict:
-    return {"id": 12345, "username": "player1"} #pass for now -add real verification later
+    # ⚠️ DEV BYPASS — see warning banner at top of file. Remove before real money.
+    return {"id": 12345, "username": "player1"}
+
     """
     Raises HTTP 401 if initData is invalid or older than 1 hour.
     Returns the user dict on success.
     """
     if not init_data or init_data == "test":
-      # raise HTTPException(401, "Missing Telegram auth")
         return {"id": 99999, "username": "testuser"}
     params = {}
     for part in init_data.split("&"):

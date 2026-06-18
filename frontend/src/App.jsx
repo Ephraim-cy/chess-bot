@@ -5,12 +5,14 @@ import { Chess } from 'chess.js'
 const API = 'https://chess-bot-production-efa2.up.railway.app'
 const WSS = 'wss://chess-bot-production-efa2.up.railway.app'
 
+const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+
 const tg = window.Telegram?.WebApp
 const tgUser = tg?.initDataUnsafe?.user || { id: 0, username: 'Player' }
 
 export default function App() {
   const [screen, setScreen]   = useState('home')
-  const [fen, setFen] = useState('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')
+  const [fen, setFen] = useState(START_FEN)
   const [status, setStatus]   = useState('')
   const [color, setColor]     = useState(null)
   const [matchId, setMatchId] = useState('')
@@ -20,9 +22,13 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [myTurnUI, setMyTurnUI] = useState(false)
 
-  const chessRef    = useRef(new Chess('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'))
+  const chessRef    = useRef(new Chess(START_FEN))
   const wsRef       = useRef(null)
   const colorRef    = useRef(null)
+  // waitingRef is now ONLY used for status text ("opponent thinking..."),
+  // not to decide whether to trust the server's FEN. The server's FEN is
+  // ALWAYS authoritative now -- this removes a whole class of desync bugs
+  // where local optimistic state and server state could disagree silently.
   const waitingRef  = useRef(false)
 
   useEffect(() => { tg?.ready(); tg?.expand() }, [])
@@ -69,6 +75,19 @@ export default function App() {
     setLoading(false)
   }
 
+  // Apply an authoritative FEN coming from the server to both the chess.js
+  // engine and the displayed board. This is now the ONLY way `fen` state
+  // changes once a game is underway -- onDrop no longer writes to `fen`
+  // directly (see onDrop below), so there is exactly one source of truth.
+  function applyServerFen(newFen) {
+    try {
+      chessRef.current = new Chess(newFen)
+      setFen(newFen)
+    } catch (e) {
+      console.error('Received invalid FEN from server, ignoring:', newFen, e)
+    }
+  }
+
   function connect(mid, clr) {
     const sock = new WebSocket(WSS + '/ws/' + mid + '/' + clr)
     wsRef.current = sock
@@ -82,45 +101,48 @@ export default function App() {
       const myClr = colorRef.current
 
       if (msg.type === 'connected') {
-        const game = new Chess(msg.fen)
-        chessRef.current = game
-        setFen(msg.fen)
+        applyServerFen(msg.fen)
         setScreen('game')
-        const mine = msg.turn === colorRef.current
+        const mine = msg.turn === myClr
         setMyTurnUI(mine)
         setStatus(mine ? '⚡ Your turn!' : '⏳ Waiting for opponent...')
         waitingRef.current = false
+        return
       }
 
       if (msg.type === 'state') {
-        if (waitingRef.current) {
-          // This is the server confirming OUR move
-          // Board is already correct locally — just update turn
-          waitingRef.current = false
-          const mine = msg.turn === colorRef.current
-          setMyTurnUI(mine)
-          if (msg.game_over && msg.result) {
-            endGame(msg.result, colorRef.current)
-          } else {
-            setStatus(mine ? '⚡ Your turn!' : '⏳ Opponent thinking...')
-          }
+        // Server is always authoritative -- always resync the board,
+        // whether this is confirming our own move or reporting the
+        // opponent's. This is the fix for the "piece snaps back" class
+        // of bugs: there is no longer a path where local state silently
+        // drifts from server state.
+        applyServerFen(msg.fen)
+        waitingRef.current = false
+        const mine = msg.turn === myClr
+        setMyTurnUI(mine && !msg.game_over)
+        if (msg.game_over && msg.result) {
+          endGame(msg.result, myClr)
         } else {
-          // Opponent moved — update board from server
-          const game = new Chess(msg.fen)
-          chessRef.current = game
-          setFen(msg.fen)
-          const mine = msg.turn === colorRef.current
-          setMyTurnUI(mine)
-          if (msg.game_over && msg.result) {
-            endGame(msg.result, colorRef.current)
-          } else {
-            setStatus(mine ? '⚡ Your turn!' : '⏳ Opponent thinking...')
-          }
+          setStatus(mine ? '⚡ Your turn!' : '⏳ Opponent thinking...')
         }
+        return
+      }
+
+      // Previously unhandled -- this is the new error type the fixed
+      // backend sends back when a move is malformed or illegal, instead
+      // of silently killing the connection. We resync to the FEN the
+      // server gives us (it includes one) and let the player try again.
+      if (msg.type === 'error') {
+        waitingRef.current = false
+        if (msg.fen) applyServerFen(msg.fen)
+        setStatus('⚠️ ' + (msg.msg || 'Move rejected — try again'))
+        const mine = msg.turn ? msg.turn === myClr : myTurnUI
+        setMyTurnUI(mine)
+        return
       }
 
       if (msg.type === 'gameover') {
-        endGame(msg, colorRef.current)
+        endGame(msg, myClr)
       }
     }
 
@@ -136,49 +158,58 @@ export default function App() {
     else setStatus('💀 You lost.')
   }
 
-  // THIS IS THE KEY FUNCTION — no myTurn check, just chess.js validation
+  // onDrop now does LOCAL validation only as a fast UI check (so illegal
+  // drags bounce back instantly without a network round trip), but it does
+  // NOT write the resulting FEN into `fen` state. The board will only
+  // visually update once the server confirms via a 'state' message. This
+  // means react-chessboard may show a brief "snap back to server position"
+  // if the network is slow, which is intentional and correct: it is never
+  // showing a position the server hasn't confirmed.
   function onDrop(from, to) {
-    // If game is over, no moves
     if (result) return false
+    if (!myTurnUI) return false  // guard against dragging when it's not your turn
 
-    // Try the move on our local chess engine
-    const game = chessRef.current
+    // Validate against a throwaway clone so we never mutate chessRef.current
+    // with a move the server hasn't confirmed yet.
+    const probe = new Chess(chessRef.current.fen())
     let move
     try {
-      move = game.move({ from, to, promotion: 'q' })
+      move = probe.move({ from, to, promotion: 'q' })
     } catch (e) {
       return false
     }
-
-    // chess.js rejected the move (illegal)
     if (!move) return false
 
-    // Move is legal — update board immediately (piece stays!)
-    const newFen = game.fen()
-    setFen(newFen)
     setMyTurnUI(false)
-    setStatus('⏳ Opponent thinking...')
+    setStatus('⏳ Sending move...')
     waitingRef.current = true
 
-    // Send to server
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: 'move',
         move: from + to + (move.promotion || '')
       }))
+    } else {
+      setStatus('❌ Not connected — move not sent')
+      setMyTurnUI(true)
+      waitingRef.current = false
+      return false
     }
 
+    // Returning true lets react-chessboard show the piece at `to` instantly
+    // for responsiveness, but `fen` state itself is untouched until the
+    // server's 'state' message arrives and calls applyServerFen().
     return true
   }
 
   function reset() {
     if (wsRef.current) wsRef.current.close()
-    chessRef.current = new Chess()
+    chessRef.current = new Chess(START_FEN)
     wsRef.current = null
     colorRef.current = null
     waitingRef.current = false
     setScreen('home')
-    setFen('start')
+    setFen(START_FEN)   // FIXED: was 'start', which chess.js v1 / react-chessboard reject as invalid
     setMyTurnUI(false)
     setColor(null)
     setResult(null)
@@ -342,7 +373,7 @@ export default function App() {
           position={fen}
           onPieceDrop={onDrop}
           boardOrientation={color === 'black' ? 'black' : 'white'}
-          arePiecesDraggable={!result}
+          arePiecesDraggable={myTurnUI && !result}
           animationDuration={200}
           customBoardStyle={{ borderRadius: 0 }}
           customDarkSquareStyle={{ backgroundColor: '#B45309' }}

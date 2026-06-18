@@ -1,4 +1,4 @@
-# backend/main.py  (FULL SECURED VERSION)
+# backend/main.py  (FULL SECURED VERSION — FIXED)
 """
 Every route follows this order:
 1. Verify Telegram initData (who are you?)
@@ -7,9 +7,22 @@ Every route follows this order:
 4. Check account status (are you allowed?)
 5. Business logic (do the thing)
 6. Record transaction (write to ledger)
+
+CHANGES IN THIS VERSION (fixing the "piece snaps back" bug):
+- A single rejected/malformed move NO LONGER kills the match.
+  Previously: any move that failed `chess.Move.from_uci()` or wasn't in
+  `board.legal_moves` was treated as cheating -> instant WebSocket close ->
+  forfeit. That meant ANY mismatch (a stale client move, a dropped packet,
+  a harmless format issue) silently ended the game and the frontend had no
+  idea why the board "reverted" — it just saw the socket die.
+- Now: bad moves get a clean {"type":"error"} response and the player can
+  try again. We only forfeit after repeated bad attempts (anti-cheat-ish),
+  tracked per connection.
+- The move string is validated for shape BEFORE being handed to python-chess,
+  so a malformed string never reaches the broad except/forfeit branch.
 """
 
-import os, uuid, json, hashlib, hmac, time
+import os, uuid, json, hashlib, hmac, time, re
 from urllib.parse import unquote
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,7 +52,10 @@ app.add_middleware(
 
 # ── Active games in memory ────────────────────────────────────────────────────
 active_games = {}
-# {match_id: {board, white_tg, black_tg, stake, ws:{white, black}, moves:[]}}
+# {match_id: {board, white_tg, black_tg, stake, ws:{white, black}, moves:[], bad_move_count:{white:0,black:0}}}
+
+UCI_MOVE_RE = re.compile(r'^[a-h][1-8][a-h][1-8][qrbn]?$')
+MAX_BAD_MOVES_BEFORE_FORFEIT = 3   # tolerate a few bad attempts before treating as malicious
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -110,6 +126,11 @@ async def owner_credit_user(
     """
     OWNER ONLY — manually credit a user after confirming their deposit.
     In Phase 3 this will be automated by the TON blockchain listener.
+
+    NOTE: the owner-only check below is currently commented out (carried
+    over from earlier dev version). Left as-is intentionally since we are
+    still on simulated/play-money balances — see SECURITY note in security.py.
+    This MUST be re-enabled before any real funds are involved.
     """
     user_data = verify_telegram(x_init_data)
     tg_id     = int(user_data["id"])
@@ -143,7 +164,7 @@ async def create_match(body: CreateMatchRequest, x_init_data: str = Header(defau
     # 1. Auth
     user_data = verify_telegram(x_init_data)
     tg_id     = int(user_data["id"])
-    username  = user_data.get("player", f"user_{12345}")
+    username  = user_data.get("username", f"user_{tg_id}")
 
     # 2. Rate limit — max 5 match creations per minute per user
     rate_limit(f"create_match:{tg_id}", 5, 60)
@@ -170,6 +191,7 @@ async def create_match(body: CreateMatchRequest, x_init_data: str = Header(defau
         "moves":    [],
         "status":   "waiting",
         "created_at": time.time(),
+        "bad_move_count": {"white": 0, "black": 0},
     }
 
     return {
@@ -233,7 +255,7 @@ async def join_match(match_id: str, x_init_data: str = Header(default="test")):
 
 
 @app.get("/api/match/{match_id}")
-async def get_match_info(match_id: str, x_init_data: str = Header(default="test")):# remeber
+async def get_match_info(match_id: str, x_init_data: str = Header(default="test")):
     verify_telegram(x_init_data)
     match_id = validate_match_id(match_id)
     if match_id not in active_games:
@@ -251,8 +273,24 @@ async def get_match_info(match_id: str, x_init_data: str = Header(default="test"
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  WEBSOCKET GAME SERVER
-#  Illegal move = instant disconnect (server is authority)
+#  Server is the authority on the board. A bad move gets a clean error and
+#  a retry — it no longer kills the match. Only repeated bad attempts (or a
+#  real attempt to push a move that IS in the right format but illegal,
+#  beyond the tolerance count) ends the game as a forfeit.
 # ─────────────────────────────────────────────────────────────────────────────
+
+def parse_move_or_none(move_str: str):
+    """
+    Returns a chess.Move if move_str is well-formed UCI (e.g. 'e2e4', 'e7e8q'),
+    otherwise None. Never raises.
+    """
+    if not isinstance(move_str, str) or not UCI_MOVE_RE.match(move_str):
+        return None
+    try:
+        return chess.Move.from_uci(move_str)
+    except Exception:
+        return None
+
 
 @app.websocket("/ws/{match_id}/{color}")
 async def ws_game(ws: WebSocket, match_id: str, color: str):
@@ -267,6 +305,7 @@ async def ws_game(ws: WebSocket, match_id: str, color: str):
 
     game = active_games[match_id]
     game["ws"][color] = ws
+    game.setdefault("bad_move_count", {"white": 0, "black": 0})
 
     await ws.send_json({
         "type":  "connected",
@@ -287,41 +326,54 @@ async def ws_game(ws: WebSocket, match_id: str, color: str):
             board = game["board"]
             expected = "white" if board.turn == chess.WHITE else "black"
 
-            # Wrong turn
+            # Wrong turn — NOT a forfeit, just tell them to wait.
             if color != expected:
                 await ws.send_json({"type": "error", "msg": "Not your turn"})
                 continue
 
-            # Validate and apply move (server is the authority)
             move_uci = str(data.get("move", ""))
-            try:
-                move = chess.Move.from_uci(move_uci)
-                if move not in board.legal_moves:
-                    raise ValueError("Illegal move")
-                board.push(move)
-                game["moves"].append(move_uci)
-            except Exception:
-                # Illegal move attempt = immediate disconnect, match treated as forfeit
-                await ws.close(code=4008, reason="Illegal move")
-                winner_color = "black" if color == "white" else "white"
-                winner_tg    = game[f"{winner_color}_tg"]
-                if winner_tg and game["status"] == "active":
-                    game["status"] = "settled"
-                    try:
-                        settle_match(match_id, winner_tg)
-                    except Exception:
-                        pass
-                    other_ws = game["ws"].get(winner_color)
-                    if other_ws:
+            move = parse_move_or_none(move_uci)
+
+            # Malformed string OR not a legal move right now.
+            # This is the branch that used to instantly close the socket.
+            if move is None or move not in board.legal_moves:
+                game["bad_move_count"][color] += 1
+                await ws.send_json({
+                    "type": "error",
+                    "msg": "Illegal move",
+                    "fen": board.fen(),          # resend authoritative FEN so client can resync
+                    "turn": expected,
+                })
+
+                if game["bad_move_count"][color] > MAX_BAD_MOVES_BEFORE_FORFEIT:
+                    # Repeated bad attempts — now treat as malicious/broken client.
+                    await ws.close(code=4008, reason="Too many illegal move attempts")
+                    winner_color = "black" if color == "white" else "white"
+                    winner_tg    = game[f"{winner_color}_tg"]
+                    if winner_tg and game["status"] == "active":
+                        game["status"] = "settled"
                         try:
-                            await other_ws.send_json({
-                                "type": "gameover", "reason": "illegal_move",
-                                "winner": winner_color,
-                                "payout": game["stake"] * 2 * 0.9,
-                            })
+                            settle_match(match_id, winner_tg)
                         except Exception:
                             pass
-                return
+                        other_ws = game["ws"].get(winner_color)
+                        if other_ws:
+                            try:
+                                await other_ws.send_json({
+                                    "type": "gameover", "reason": "illegal_move",
+                                    "winner": winner_color,
+                                    "payout": game["stake"] * 2 * 0.9,
+                                })
+                            except Exception:
+                                pass
+                        active_games.pop(match_id, None)
+                    return
+                continue
+
+            # Legal move — apply it and reset the bad-move counter for this side.
+            game["bad_move_count"][color] = 0
+            board.push(move)
+            game["moves"].append(move_uci)
 
             # ── Determine result ──
             result = None
@@ -335,7 +387,6 @@ async def ws_game(ws: WebSocket, match_id: str, color: str):
                     "payout": float(game["stake"]) * 2 * 0.9,
                     "rake":   float(game["stake"]) * 2 * 0.1,
                 }
-                # Settle immediately on game end
                 if game["status"] == "active":
                     game["status"] = "settled"
                     try:
@@ -361,6 +412,7 @@ async def ws_game(ws: WebSocket, match_id: str, color: str):
                 "type":      "state",
                 "fen":       board.fen(),
                 "last_move": move_uci,
+                "mover":     color,            # tells clients who just moved
                 "turn":      "white" if board.turn == chess.WHITE else "black",
                 "in_check":  board.is_check(),
                 "game_over": result is not None,
@@ -376,7 +428,7 @@ async def ws_game(ws: WebSocket, match_id: str, color: str):
                         pass
 
             if result:
-                del active_games[match_id]
+                active_games.pop(match_id, None)
                 return
 
     except WebSocketDisconnect:
@@ -402,3 +454,4 @@ async def ws_game(ws: WebSocket, match_id: str, color: str):
                     })
                 except Exception:
                     pass
+            active_games.pop(match_id, None)
