@@ -127,10 +127,6 @@ export default function App() {
 
   function onDrop(from, to) {
     console.log("=== ♟️ ON DROP TRIGGERED ===");
-    console.log("Moving from:", from, "to:", to);
-    console.log("Is game over? (result):", !!result);
-    console.log("Is UI turn active? (myTurnUI):", myTurnUI);
-    console.log("Does chessRef engine exist?:", !!chessRef.current);
     
     if (result) {
       console.log("⛔ SNAPBACK: Game is already over.");
@@ -138,43 +134,43 @@ export default function App() {
     }
     
     if (!myTurnUI) {
-      console.log("⛔ SNAPBACK: myTurnUI is FALSE. The UI thinks it is not your turn.");
+      console.log("⛔ SNAPBACK: myTurnUI is FALSE. Not your turn.");
       return false;
     }
 
     try {
       const game = chessRef.current;
       if (!game) {
-        console.log("⛔ SNAPBACK: chessRef.current is missing or uninitialized.");
+        console.log("⛔ SNAPBACK: chessRef engine missing.");
         return false;
       }
 
-      console.log("Engine FEN before move:", game.fen());
+      // Validate move via chess.js local engine
       const move = game.move({ from, to, promotion: 'q' });
       
       if (!move) {
-        console.log("⛔ SNAPBACK: chess.js engine rejected this move as ILLEGAL.");
+        console.log("⛔ SNAPBACK: chess.js rejected this move as ILLEGAL.");
         return false;
       }
 
       console.log("✅ Move allowed by engine:", move);
       
-      const newFen = game.fen();
-      setTimeout(() => {
-        setFen(newFen);
-      }, 0);
-
+      // CRITICAL FIX: Update ALL states completely synchronously.
+      // This forces React to batch the re-render so the Chessboard 
+      // component receives the NEW FEN immediately without an intermediate frame.
+      setFen(game.fen());
       setMyTurnUI(false);
       setStatus('⏳ Opponent thinking...');
       waitingRef.current = true;
 
+      // Dispatch move over WebSocket channel
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({
           type: 'move',
           move: from + to + (move.promotion || '')
         }));
       } else {
-        console.log("⚠️ WARNING: WebSocket is closed. Move not sent to server.");
+        console.log("⚠️ WARNING: WebSocket is closed. Move not sent.");
       }
 
       return true;
@@ -191,7 +187,7 @@ export default function App() {
     colorRef.current = null
     waitingRef.current = false
     setScreen('home')
-    setFen('start')
+    setFen('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')
     setMyTurnUI(false)
     setColor(null)
     setResult(null)
@@ -231,7 +227,7 @@ export default function App() {
     })
   }
 
-  // HOME SCREEN
+  // HOME
   if (screen === 'home') return (
     <div style={S.page}>
       <div style={{ fontSize: 52 }}>♟</div>
@@ -297,7 +293,7 @@ export default function App() {
     </div>
   )
 
-  // LOBBY SCREEN
+  // LOBBY
   if (screen === 'lobby') return (
     <div style={S.page}>
       <div style={{ fontSize: 52 }}>⚔️</div>
@@ -321,7 +317,7 @@ export default function App() {
     </div>
   )
 
-  // GAME SCREEN
+  // GAME
   return (
     <div style={{ ...S.page, padding: '10px 10px 28px', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: 460 }}>
