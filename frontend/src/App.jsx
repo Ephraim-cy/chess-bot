@@ -86,7 +86,7 @@ export default function App() {
         chessRef.current = game
         setFen(msg.fen)
         setScreen('game')
-        const mine = msg.turn === myClr
+        const mine = msg.turn === colorRef.current
         setMyTurnUI(mine)
         setStatus(mine ? '⚡ Your turn!' : '⏳ Waiting for opponent...')
         waitingRef.current = false
@@ -97,10 +97,10 @@ export default function App() {
           // This is the server confirming OUR move
           // Board is already correct locally — just update turn
           waitingRef.current = false
-          const mine = msg.turn === myClr
+          const mine = msg.turn === colorRef.current
           setMyTurnUI(mine)
           if (msg.game_over && msg.result) {
-            endGame(msg.result, myClr)
+            endGame(msg.result, colorRef.current)
           } else {
             setStatus(mine ? '⚡ Your turn!' : '⏳ Opponent thinking...')
           }
@@ -109,10 +109,10 @@ export default function App() {
           const game = new Chess(msg.fen)
           chessRef.current = game
           setFen(msg.fen)
-          const mine = msg.turn === myClr
+          const mine = msg.turn === colorRef.current
           setMyTurnUI(mine)
           if (msg.game_over && msg.result) {
-            endGame(msg.result, myClr)
+            endGame(msg.result, colorRef.current)
           } else {
             setStatus(mine ? '⚡ Your turn!' : '⏳ Opponent thinking...')
           }
