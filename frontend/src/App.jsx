@@ -206,24 +206,62 @@ function connect(mid, clr) {
     // chess.js rejected the move (illegal)
     if (!move) return false*/
 function onDrop(from, to) {
-    if (result) return false;
+  console.log("=== ♟️ ON DROP TRIGGERED ===");
+  console.log("Moving from:", from, "to:", to);
+  console.log("Is game over? (result):", !!result);
+  console.log("Is UI turn active? (myTurnUI):", myTurnUI);
+  console.log("Does chessRef engine exist?:", !!chessRef.current);
+  
+  if (result) {
+    console.log("⛔ SNAPBACK: Game is already over.");
+    return false;
+  }
+  
+  if (!myTurnUI) {
+    console.log("⛔ SNAPBACK: myTurnUI is FALSE. The UI thinks it is not your turn.");
+    return false;
+  }
 
-    // Strict turn gate: if the UI says it's not your turn, don't allow moves
-    if (!myTurnUI) return false;
-
+  try {
     const game = chessRef.current;
-    let move;
-    try {
-      // Validate move against rules of chess
-      move = game.move({ from, to, promotion: 'q' });
-    } catch (e) {
-      return false; // Crucial: returns false on illegal moves to snap piece back
+    if (!game) {
+      console.log("⛔ SNAPBACK: chessRef.current is missing or uninitialized.");
+      return false;
     }
 
-    // If chess.js rejects the move outright
-    if (!move) return false;
+    console.log("Engine FEN before move:", game.fen());
+    const move = game.move({ from, to, promotion: 'q' });
+    
+    if (!move) {
+      console.log("⛔ SNAPBACK: chess.js engine rejected this move as ILLEGAL.");
+      return false;
+    }
 
-    const newFen = game.fen();
+    console.log("✅ Move allowed by engine:", move);
+    
+    setTimeout(() => {
+      setFen(game.fen());
+    }, 0);
+
+    setMyTurnUI(false);
+    setStatus('⏳ Opponent thinking...');
+    waitingRef.current = true;
+
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'move',
+        move: from + to + (move.promotion || '')
+      }));
+    } else {
+      console.log("⚠️ WARNING: WebSocket is closed. Move not sent to server.");
+    }
+
+    return true;
+  } catch (error) {
+    console.error("💥 CRASH inside onDrop function:", error);
+    return false;
+  }
+}
 
     // CRITICAL FIX: Defer the FEN state update by 1 tick.
     // This allows react-chessboard to complete its drop animation cycle 
@@ -246,6 +284,24 @@ function onDrop(from, to) {
     }
 
     return true;
+  }
+  
+    // Move is legal — update board immediately (piece stays!)
+    const newFen = game.fen()
+    setFen(newFen)
+    setMyTurnUI(false)
+    setStatus('⏳ Opponent thinking...')
+    waitingRef.current = true
+
+    // Send to server
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'move',
+        move: from + to + (move.promotion || '')
+      }))
+    }
+
+    return true
   }
 
   function reset() {
@@ -446,4 +502,4 @@ function onDrop(from, to) {
       )}
     </div>
   )
-}
+
