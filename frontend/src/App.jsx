@@ -86,7 +86,8 @@ export default function App() {
         setFen(msg.fen)
         setScreen('game')
         
-        const mine = msg.turn === clr
+        // Robust turn normalizer supporting both format variants ('w' vs 'white')
+        const mine = msg.turn === clr || msg.turn === (clr === 'white' ? 'w' : 'b')
         setMyTurnUI(mine)
         setStatus(mine ? '⚡ Your turn!' : '⏳ Waiting for opponent...')
         waitingRef.current = false
@@ -98,7 +99,7 @@ export default function App() {
         chessRef.current = new Chess(msg.fen)
         setFen(msg.fen)
 
-        const mine = msg.turn === clr
+        const mine = msg.turn === clr || msg.turn === (clr === 'white' ? 'w' : 'b')
         setMyTurnUI(mine)
 
         if (msg.game_over && msg.result) {
@@ -125,57 +126,55 @@ export default function App() {
     else setStatus('💀 You lost.')
   }
 
+  // FIXED: 100% Closure-Insulated Input Event Handler
   function onDrop(from, to) {
-    console.log("=== ♟️ ON DROP TRIGGERED ===");
-    
-    if (result) {
-      console.log("⛔ SNAPBACK: Game is already over.");
+    const game = chessRef.current;
+    if (!game) return false;
+
+    // 1. Bypass state snapshot: Ask engine directly if game is over
+    if (game.isGameOver()) {
+      console.log("⛔ Move rejected: Game is over.");
       return false;
     }
-    
-    if (!myTurnUI) {
-      console.log("⛔ SNAPBACK: myTurnUI is FALSE. Not your turn.");
+
+    // 2. Bypass myTurnUI state closure: Ask engine directly whose turn it is
+    const engineTurn = game.turn(); // Returns 'w' or 'b'
+    const playerColor = colorRef.current; // Returns 'white' or 'black'
+    const expectedTurnCode = playerColor === 'white' ? 'w' : 'b';
+
+    if (engineTurn !== expectedTurnCode) {
+      console.log(`⛔ Snapback: Not your turn. Engine expects: ${engineTurn}, Ref contains: ${playerColor}`);
       return false;
     }
 
     try {
-      const game = chessRef.current;
-      if (!game) {
-        console.log("⛔ SNAPBACK: chessRef engine missing.");
-        return false;
-      }
-
-      // Validate move via chess.js local engine
+      // 3. Process move validation inside local engine
       const move = game.move({ from, to, promotion: 'q' });
       
       if (!move) {
-        console.log("⛔ SNAPBACK: chess.js rejected this move as ILLEGAL.");
+        console.log("⛔ Snapback: chess.js flagged move as illegal.");
         return false;
       }
 
-      console.log("✅ Move allowed by engine:", move);
+      console.log("✅ Move successfully executed:", move);
       
-      // CRITICAL FIX: Update ALL states completely synchronously.
-      // This forces React to batch the re-render so the Chessboard 
-      // component receives the NEW FEN immediately without an intermediate frame.
+      // 4. Synchronously batch updates to avoid rendering frame gaps
       setFen(game.fen());
       setMyTurnUI(false);
       setStatus('⏳ Opponent thinking...');
       waitingRef.current = true;
 
-      // Dispatch move over WebSocket channel
+      // 5. Send out via streaming socket channel
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({
           type: 'move',
           move: from + to + (move.promotion || '')
         }));
-      } else {
-        console.log("⚠️ WARNING: WebSocket is closed. Move not sent.");
       }
 
       return true;
     } catch (error) {
-      console.error("💥 CRASH inside onDrop function:", error);
+      console.error("💥 Local execution check error:", error);
       return false;
     }
   }
@@ -227,7 +226,7 @@ export default function App() {
     })
   }
 
-  // HOME
+  // HOME SCREEN
   if (screen === 'home') return (
     <div style={S.page}>
       <div style={{ fontSize: 52 }}>♟</div>
@@ -293,7 +292,7 @@ export default function App() {
     </div>
   )
 
-  // LOBBY
+  // LOBBY SCREEN
   if (screen === 'lobby') return (
     <div style={S.page}>
       <div style={{ fontSize: 52 }}>⚔️</div>
@@ -317,7 +316,7 @@ export default function App() {
     </div>
   )
 
-  // GAME
+  // GAME SCREEN
   return (
     <div style={{ ...S.page, padding: '10px 10px 28px', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: 460 }}>
