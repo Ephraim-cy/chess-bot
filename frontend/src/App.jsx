@@ -68,8 +68,7 @@ export default function App() {
     }
     setLoading(false)
   }
-
-  function connect(mid, clr) {
+/*  function connect(mid, clr) {
     const sock = new WebSocket(WSS + '/ws/' + mid + '/' + clr)
     wsRef.current = sock
 
@@ -127,7 +126,61 @@ export default function App() {
     sock.onclose = () => setStatus('🔌 Disconnected')
     sock.onerror = () => setStatus('❌ Connection error')
   }
+*/
+function connect(mid, clr) {
+  // 1. Force the ref to sync immediately with the parameter
+  colorRef.current = clr;
 
+  const sock = new WebSocket(WSS + '/ws/' + mid + '/' + clr)
+  wsRef.current = sock
+
+  sock.onopen = () => {
+    setStatus(clr === 'white' ? '⏳ Waiting for opponent...' : '⚡ Game on!')
+  }
+
+  sock.onmessage = (evt) => {
+    const msg = JSON.parse(evt.data)
+
+    // Handle initial connection setup
+    if (msg.type === 'connected') {
+      chessRef.current = new Chess(msg.fen)
+      setFen(msg.fen)
+      setScreen('game')
+      
+      const mine = msg.turn === clr
+      setMyTurnUI(mine)
+      setStatus(mine ? '⚡ Your turn!' : '⏳ Waiting for opponent...')
+      waitingRef.current = false
+    }
+
+    // Handle live state updates (moves)
+    if (msg.type === 'state') {
+      waitingRef.current = false // Reset our local move block immediately
+
+      // ALWAYS update your chess engine state and UI FEN to stay in perfect sync
+      chessRef.current = new Chess(msg.fen)
+      setFen(msg.fen)
+
+      const mine = msg.turn === clr
+      setMyTurnUI(mine)
+
+      if (msg.game_over && msg.result) {
+        // Pass the standardized object structure
+        endGame({ winner: msg.result.winner, reason: msg.result.reason }, clr)
+      } else {
+        setStatus(mine ? '⚡ Your turn!' : '⏳ Opponent thinking...')
+      }
+    }
+
+    // Handle official match-ending packets
+    if (msg.type === 'gameover') {
+      endGame(msg, clr)
+    }
+  }
+
+  sock.onclose = () => setStatus('🔌 Disconnected')
+  sock.onerror = () => setStatus('❌ Connection error')
+}
   function endGame(r, clr) {
     setMyTurnUI(false)
     setResult(r)
@@ -136,7 +189,7 @@ export default function App() {
     else setStatus('💀 You lost.')
   }
 
-  // THIS IS THE KEY FUNCTION — no myTurn check, just chess.js validation
+  /* THIS IS THE KEY FUNCTION — no myTurn check, just chess.js validation
   function onDrop(from, to) {
     // If game is over, no moves
     if (result) return false
@@ -151,24 +204,48 @@ export default function App() {
     }
 
     // chess.js rejected the move (illegal)
-    if (!move) return false
+    if (!move) return false*/
+function onDrop(from, to) {
+    if (result) return false;
 
-    // Move is legal — update board immediately (piece stays!)
-    const newFen = game.fen()
-    setFen(newFen)
-    setMyTurnUI(false)
-    setStatus('⏳ Opponent thinking...')
-    waitingRef.current = true
+    // Strict turn gate: if the UI says it's not your turn, don't allow moves
+    if (!myTurnUI) return false;
 
-    // Send to server
+    const game = chessRef.current;
+    let move;
+    try {
+      // Validate move against rules of chess
+      move = game.move({ from, to, promotion: 'q' });
+    } catch (e) {
+      return false; // Crucial: returns false on illegal moves to snap piece back
+    }
+
+    // If chess.js rejects the move outright
+    if (!move) return false;
+
+    const newFen = game.fen();
+
+    // CRITICAL FIX: Defer the FEN state update by 1 tick.
+    // This allows react-chessboard to complete its drop animation cycle 
+    // cleanly before React triggers a full component re-render.
+    setTimeout(() => {
+      setFen(newFen);
+    }, 0);
+
+    // Optimistically update turn and statuses locally
+    setMyTurnUI(false);
+    setStatus('⏳ Opponent thinking...');
+    waitingRef.current = true;
+
+    // Dispatch move over the WebSocket channel
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: 'move',
         move: from + to + (move.promotion || '')
-      }))
+      }));
     }
 
-    return true
+    return true;
   }
 
   function reset() {
