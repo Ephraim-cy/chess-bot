@@ -138,41 +138,27 @@ export default function App() {
 
   // THIS IS THE KEY FUNCTION — no myTurn check, just chess.js validation
   function onDrop(from, to) {
-    // If it's not your turn, or the game is over, don't allow the drop
-    if (!myTurn || result) return false
+    // If game is over, no moves
+    if (result) return false
 
-    // 1. Create a fresh instance from the EXACT current visual state
-    // This forces the logic engine to perfectly match the screen
-    const g = new Chess(fen)
-
-    // 2. Try the move locally first
-    let move = null
+    // Try the move on our local chess engine
+    const game = chessRef.current
+    let move
     try {
-      move = g.move({ from, to, promotion: 'q' })
+      move = game.move({ from, to, promotion: 'q' })
     } catch (e) {
-      return false // The engine threw an error (illegal move)
+      return false
     }
 
-    // 3. If the move is invalid, snap the piece back
+    // chess.js rejected the move (illegal)
     if (!move) return false
 
-    // 4. Move is VALID! Update the UI instantly so the piece STICKS
-    setFen(g.fen())
-    setMyTurn(false)
-    setMoves(g.history())
-    setMsg('⏳ Opponent thinking...', 'info')
-
-    // 5. Send the move to the server
-    wsRef.current?.send(JSON.stringify({ 
-      type: 'move', 
-      move: from + to + (move.promotion || '') 
-    }))
-
-    // 6. Update the ref for the next turn
-    gameRef.current = g
-
-    return true // Tells the board: "Yes, keep the piece here!"
-  } 
+    // Move is legal — update board immediately (piece stays!)
+    const newFen = game.fen()
+    setFen(newFen)
+    setMyTurnUI(false)
+    setStatus('⏳ Opponent thinking...')
+    waitingRef.current = true
 
     // Send to server
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
