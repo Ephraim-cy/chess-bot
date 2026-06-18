@@ -10,7 +10,7 @@ const tgUser = tg?.initDataUnsafe?.user || { id: 0, username: 'Player' }
 
 export default function App() {
   const [screen, setScreen]   = useState('home')
-  const [fen, setFen]         = useState('start')
+  const [fen, setFen] = useState('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')
   const [status, setStatus]   = useState('')
   const [color, setColor]     = useState(null)
   const [matchId, setMatchId] = useState('')
@@ -20,7 +20,7 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [myTurnUI, setMyTurnUI] = useState(false)
 
-  const chessRef    = useRef(new Chess())
+  const chessRef    = useRef(new Chess('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'))
   const wsRef       = useRef(null)
   const colorRef    = useRef(null)
   const waitingRef  = useRef(false)
