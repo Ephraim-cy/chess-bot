@@ -10,7 +10,7 @@ const tgUser = tg?.initDataUnsafe?.user || { id: 0, username: 'Player' }
 
 export default function App() {
   const [screen, setScreen]   = useState('home')
-  const [fen, setFen] = useState('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')
+  const [fen, setFen]         = useState('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')
   const [status, setStatus]   = useState('')
   const [color, setColor]     = useState(null)
   const [matchId, setMatchId] = useState('')
@@ -68,7 +68,9 @@ export default function App() {
     }
     setLoading(false)
   }
-/*  function connect(mid, clr) {
+
+  function connect(mid, clr) {
+    colorRef.current = clr
     const sock = new WebSocket(WSS + '/ws/' + mid + '/' + clr)
     wsRef.current = sock
 
@@ -78,109 +80,43 @@ export default function App() {
 
     sock.onmessage = (evt) => {
       const msg = JSON.parse(evt.data)
-      const myClr = colorRef.current
 
       if (msg.type === 'connected') {
-        const game = new Chess(msg.fen)
-        chessRef.current = game
+        chessRef.current = new Chess(msg.fen)
         setFen(msg.fen)
         setScreen('game')
-        const mine = msg.turn === colorRef.current
+        
+        const mine = msg.turn === clr
         setMyTurnUI(mine)
         setStatus(mine ? '⚡ Your turn!' : '⏳ Waiting for opponent...')
         waitingRef.current = false
       }
 
       if (msg.type === 'state') {
-        if (waitingRef.current) {
-          // This is the server confirming OUR move
-          // Board is already correct locally — just update turn
-          waitingRef.current = false
-          const mine = msg.turn === colorRef.current
-          setMyTurnUI(mine)
-          if (msg.game_over && msg.result) {
-            endGame(msg.result, colorRef.current)
-          } else {
-            setStatus(mine ? '⚡ Your turn!' : '⏳ Opponent thinking...')
-          }
+        waitingRef.current = false 
+
+        chessRef.current = new Chess(msg.fen)
+        setFen(msg.fen)
+
+        const mine = msg.turn === clr
+        setMyTurnUI(mine)
+
+        if (msg.game_over && msg.result) {
+          endGame({ winner: msg.result.winner, reason: msg.result.reason }, clr)
         } else {
-          // Opponent moved — update board from server
-          const game = new Chess(msg.fen)
-          chessRef.current = game
-          setFen(msg.fen)
-          const mine = msg.turn === colorRef.current
-          setMyTurnUI(mine)
-          if (msg.game_over && msg.result) {
-            endGame(msg.result, colorRef.current)
-          } else {
-            setStatus(mine ? '⚡ Your turn!' : '⏳ Opponent thinking...')
-          }
+          setStatus(mine ? '⚡ Your turn!' : '⏳ Opponent thinking...')
         }
       }
 
       if (msg.type === 'gameover') {
-        endGame(msg, colorRef.current)
+        endGame(msg, clr)
       }
     }
 
     sock.onclose = () => setStatus('🔌 Disconnected')
     sock.onerror = () => setStatus('❌ Connection error')
   }
-*/
-function connect(mid, clr) {
-  // 1. Force the ref to sync immediately with the parameter
-  colorRef.current = clr;
 
-  const sock = new WebSocket(WSS + '/ws/' + mid + '/' + clr)
-  wsRef.current = sock
-
-  sock.onopen = () => {
-    setStatus(clr === 'white' ? '⏳ Waiting for opponent...' : '⚡ Game on!')
-  }
-
-  sock.onmessage = (evt) => {
-    const msg = JSON.parse(evt.data)
-
-    // Handle initial connection setup
-    if (msg.type === 'connected') {
-      chessRef.current = new Chess(msg.fen)
-      setFen(msg.fen)
-      setScreen('game')
-      
-      const mine = msg.turn === clr
-      setMyTurnUI(mine)
-      setStatus(mine ? '⚡ Your turn!' : '⏳ Waiting for opponent...')
-      waitingRef.current = false
-    }
-
-    // Handle live state updates (moves)
-    if (msg.type === 'state') {
-      waitingRef.current = false // Reset our local move block immediately
-
-      // ALWAYS update your chess engine state and UI FEN to stay in perfect sync
-      chessRef.current = new Chess(msg.fen)
-      setFen(msg.fen)
-
-      const mine = msg.turn === clr
-      setMyTurnUI(mine)
-
-      if (msg.game_over && msg.result) {
-        // Pass the standardized object structure
-        endGame({ winner: msg.result.winner, reason: msg.result.reason }, clr)
-      } else {
-        setStatus(mine ? '⚡ Your turn!' : '⏳ Opponent thinking...')
-      }
-    }
-
-    // Handle official match-ending packets
-    if (msg.type === 'gameover') {
-      endGame(msg, clr)
-    }
-  }
-
-  sock.onclose = () => setStatus('🔌 Disconnected')
-  sock.onerror = () => setStatus('❌ Connection error')
-}
   function endGame(r, clr) {
     setMyTurnUI(false)
     setResult(r)
@@ -189,119 +125,63 @@ function connect(mid, clr) {
     else setStatus('💀 You lost.')
   }
 
-  /* THIS IS THE KEY FUNCTION — no myTurn check, just chess.js validation
   function onDrop(from, to) {
-    // If game is over, no moves
-    if (result) return false
+    console.log("=== ♟️ ON DROP TRIGGERED ===");
+    console.log("Moving from:", from, "to:", to);
+    console.log("Is game over? (result):", !!result);
+    console.log("Is UI turn active? (myTurnUI):", myTurnUI);
+    console.log("Does chessRef engine exist?:", !!chessRef.current);
+    
+    if (result) {
+      console.log("⛔ SNAPBACK: Game is already over.");
+      return false;
+    }
+    
+    if (!myTurnUI) {
+      console.log("⛔ SNAPBACK: myTurnUI is FALSE. The UI thinks it is not your turn.");
+      return false;
+    }
 
-    // Try the move on our local chess engine
-    const game = chessRef.current
-    let move
     try {
-      move = game.move({ from, to, promotion: 'q' })
-    } catch (e) {
-      return false
-    }
+      const game = chessRef.current;
+      if (!game) {
+        console.log("⛔ SNAPBACK: chessRef.current is missing or uninitialized.");
+        return false;
+      }
 
-    // chess.js rejected the move (illegal)
-    if (!move) return false*/
-function onDrop(from, to) {
-  console.log("=== ♟️ ON DROP TRIGGERED ===");
-  console.log("Moving from:", from, "to:", to);
-  console.log("Is game over? (result):", !!result);
-  console.log("Is UI turn active? (myTurnUI):", myTurnUI);
-  console.log("Does chessRef engine exist?:", !!chessRef.current);
-  
-  if (result) {
-    console.log("⛔ SNAPBACK: Game is already over.");
-    return false;
-  }
-  
-  if (!myTurnUI) {
-    console.log("⛔ SNAPBACK: myTurnUI is FALSE. The UI thinks it is not your turn.");
-    return false;
-  }
+      console.log("Engine FEN before move:", game.fen());
+      const move = game.move({ from, to, promotion: 'q' });
+      
+      if (!move) {
+        console.log("⛔ SNAPBACK: chess.js engine rejected this move as ILLEGAL.");
+        return false;
+      }
 
-  try {
-    const game = chessRef.current;
-    if (!game) {
-      console.log("⛔ SNAPBACK: chessRef.current is missing or uninitialized.");
+      console.log("✅ Move allowed by engine:", move);
+      
+      const newFen = game.fen();
+      setTimeout(() => {
+        setFen(newFen);
+      }, 0);
+
+      setMyTurnUI(false);
+      setStatus('⏳ Opponent thinking...');
+      waitingRef.current = true;
+
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: 'move',
+          move: from + to + (move.promotion || '')
+        }));
+      } else {
+        console.log("⚠️ WARNING: WebSocket is closed. Move not sent to server.");
+      }
+
+      return true;
+    } catch (error) {
+      console.error("💥 CRASH inside onDrop function:", error);
       return false;
     }
-
-    console.log("Engine FEN before move:", game.fen());
-    const move = game.move({ from, to, promotion: 'q' });
-    
-    if (!move) {
-      console.log("⛔ SNAPBACK: chess.js engine rejected this move as ILLEGAL.");
-      return false;
-    }
-
-    console.log("✅ Move allowed by engine:", move);
-    
-    setTimeout(() => {
-      setFen(game.fen());
-    }, 0);
-
-    setMyTurnUI(false);
-    setStatus('⏳ Opponent thinking...');
-    waitingRef.current = true;
-
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'move',
-        move: from + to + (move.promotion || '')
-      }));
-    } else {
-      console.log("⚠️ WARNING: WebSocket is closed. Move not sent to server.");
-    }
-
-    return true;
-  } catch (error) {
-    console.error("💥 CRASH inside onDrop function:", error);
-    return false;
-  }
-}
-
-    // CRITICAL FIX: Defer the FEN state update by 1 tick.
-    // This allows react-chessboard to complete its drop animation cycle 
-    // cleanly before React triggers a full component re-render.
-    setTimeout(() => {
-      setFen(newFen);
-    }, 0);
-
-    // Optimistically update turn and statuses locally
-    setMyTurnUI(false);
-    setStatus('⏳ Opponent thinking...');
-    waitingRef.current = true;
-
-    // Dispatch move over the WebSocket channel
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'move',
-        move: from + to + (move.promotion || '')
-      }));
-    }
-
-    return true;
-  }
-  
-    // Move is legal — update board immediately (piece stays!)
-    const newFen = game.fen()
-    setFen(newFen)
-    setMyTurnUI(false)
-    setStatus('⏳ Opponent thinking...')
-    waitingRef.current = true
-
-    // Send to server
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'move',
-        move: from + to + (move.promotion || '')
-      }))
-    }
-
-    return true
   }
 
   function reset() {
@@ -351,7 +231,7 @@ function onDrop(from, to) {
     })
   }
 
-  // HOME
+  // HOME SCREEN
   if (screen === 'home') return (
     <div style={S.page}>
       <div style={{ fontSize: 52 }}>♟</div>
@@ -417,7 +297,7 @@ function onDrop(from, to) {
     </div>
   )
 
-  // LOBBY
+  // LOBBY SCREEN
   if (screen === 'lobby') return (
     <div style={S.page}>
       <div style={{ fontSize: 52 }}>⚔️</div>
@@ -441,7 +321,7 @@ function onDrop(from, to) {
     </div>
   )
 
-  // GAME
+  // GAME SCREEN
   return (
     <div style={{ ...S.page, padding: '10px 10px 28px', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: 460 }}>
@@ -502,4 +382,4 @@ function onDrop(from, to) {
       )}
     </div>
   )
-
+}
