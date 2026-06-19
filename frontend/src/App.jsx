@@ -316,7 +316,7 @@ export default function App() {
   function bump() { setTick(t => t + 1) }
 
   useEffect(() => { tg?.ready(); tg?.expand() }, [])
-
+/*
   // ─── VS COMPUTER: bot move trigger ────────────────────────────────────────
   useEffect(() => {
     if (screen !== 'game' || mode !== 'computer' || gameOver || botThinking) return
@@ -344,9 +344,37 @@ export default function App() {
       bump()
       if (!chess.isGameOver()) setStatus('⚡️ Your turn!')
     })
-    return () => { cancelled = true }
+    return () => { cancelled = true }*/
+    // ─── VS COMPUTER: bot move trigger ────────────────────────────────────────
+  useEffect(() => {
+    if (screen !== 'game' || mode !== 'computer' || gameOver) return
+    const chess = chessRef.current
+    const botCol = playerColor === 'white' ? 'b' : 'w'
+    if (chess.turn() !== botCol || chess.isGameOver()) return
+
+    setStatus('🤖 Computer thinking...')
+
+    const timer = setTimeout(() => {
+      const uci = getBotMove(chess.fen(), difficulty)
+      if (!uci) return
+      const from = uci.slice(0, 2), to = uci.slice(2, 4), promo = uci[4] || 'q'
+      try {
+        const move = chess.move({ from, to, promotion: promo })
+        if (move) {
+          setLastMove({ from, to })
+          setMoveHistory(h => [...h, move.san])
+          checkComputerGameOver(chess)
+          bump()
+          if (!chess.isGameOver()) setStatus('⚡️ Your turn!')
+        }
+      } catch {}
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [tick, screen, mode, gameOver, playerColor, difficulty])
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick, screen, mode, gameOver, botThinking])
+  //}, [tick, screen, mode, gameOver, botThinking])
 
   function checkComputerGameOver(chess) {
     if (!chess.isGameOver()) return
