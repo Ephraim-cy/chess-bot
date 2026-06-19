@@ -86,6 +86,138 @@ function fetchAIMove(fen, difficulty) {
   })
 }
 
+// ─── SOUND ENGINE (Web Audio API — no libraries needed) ──────────────────────
+const AudioCtx = window.AudioContext || window.webkitAudioContext
+
+function createSoundEngine() {
+  let ctx = null
+
+  function getCtx() {
+    if (!ctx) ctx = new AudioCtx()
+    // Resume if suspended (browser autoplay policy)
+    if (ctx.state === 'suspended') ctx.resume()
+    return ctx
+  }
+
+  function playTone({ type = 'sine', freq, freq2, duration, volume = 0.4, attack = 0.01, decay = 0.1, fadeStart, notes }) {
+    const c = getCtx()
+    const now = c.currentTime
+
+    // If notes array given, play each note sequentially
+    if (notes) {
+      notes.forEach(n => playTone(n))
+      return
+    }
+
+    const osc  = c.createOscillator()
+    const gain = c.createGain()
+    osc.connect(gain)
+    gain.connect(c.destination)
+
+    osc.type = type
+    osc.frequency.setValueAtTime(freq, now)
+    if (freq2) osc.frequency.exponentialRampToValueAtTime(freq2, now + duration * 0.5)
+
+    gain.gain.setValueAtTime(0, now)
+    gain.gain.linearRampToValueAtTime(volume, now + attack)
+    if (fadeStart != null) {
+      gain.gain.setValueAtTime(volume, now + fadeStart)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration)
+    } else {
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration)
+    }
+
+    osc.start(now)
+    osc.stop(now + duration)
+  }
+
+  return {
+    // Soft woody thud — piece placed on board
+    move() {
+      playTone({ type: 'triangle', freq: 180, freq2: 90, duration: 0.18, volume: 0.5, attack: 0.005 })
+    },
+
+    // Harder crack — piece taken
+    capture() {
+      playTone({ type: 'sawtooth', freq: 260, freq2: 80, duration: 0.22, volume: 0.45, attack: 0.005 })
+      setTimeout(() => playTone({ type: 'triangle', freq: 120, duration: 0.15, volume: 0.3 }), 60)
+    },
+
+    // Tense two-tone pulse — king is in check
+    check() {
+      playTone({ notes: [
+        { type: 'square', freq: 440, duration: 0.12, volume: 0.3, attack: 0.01 },
+        { type: 'square', freq: 554, duration: 0.12, volume: 0.3, attack: 0.01, fadeStart: 0.08 }
+      ]})
+      setTimeout(() => playTone({ type: 'square', freq: 554, duration: 0.14, volume: 0.3 }), 160)
+    },
+
+    // Castling — double knock
+    castle() {
+      playTone({ type: 'triangle', freq: 200, freq2: 110, duration: 0.16, volume: 0.45, attack: 0.005 })
+      setTimeout(() => playTone({ type: 'triangle', freq: 160, freq2: 90, duration: 0.16, volume: 0.35, attack: 0.005 }), 120)
+    },
+
+    // Rising arpeggio — game start
+    gameStart() {
+      const notes = [261, 329, 392, 523]
+      notes.forEach((f, i) => {
+        setTimeout(() => playTone({ type: 'sine', freq: f, duration: 0.25, volume: 0.3, attack: 0.02 }), i * 120)
+      })
+    },
+
+    // Triumphant fanfare — you win
+    win() {
+      const seq = [
+        { freq: 392, dur: 120 }, { freq: 392, dur: 120 }, { freq: 392, dur: 120 },
+        { freq: 523, dur: 400 }, { freq: 440, dur: 200 }, { freq: 523, dur: 500 }
+      ]
+      let t = 0
+      seq.forEach(({ freq, dur }) => {
+        setTimeout(() => playTone({ type: 'sine', freq, duration: dur / 1000 + 0.05, volume: 0.35, attack: 0.02 }), t)
+        t += dur + 20
+      })
+    },
+
+    // Descending sad tones — you lose
+    lose() {
+      const seq = [{ freq: 330, dur: 200 }, { freq: 277, dur: 200 }, { freq: 220, dur: 400 }]
+      let t = 0
+      seq.forEach(({ freq, dur }) => {
+        setTimeout(() => playTone({ type: 'sine', freq, duration: dur / 1000 + 0.05, volume: 0.28, attack: 0.02 }), t)
+        t += dur + 20
+      })
+    },
+
+    // Neutral chord — draw
+    draw() {
+      playTone({ type: 'sine', freq: 330, duration: 0.5, volume: 0.25, attack: 0.04 })
+      playTone({ type: 'sine', freq: 392, duration: 0.5, volume: 0.2,  attack: 0.04 })
+    },
+
+    // Soft click — UI button press
+    click() {
+      playTone({ type: 'sine', freq: 600, freq2: 400, duration: 0.08, volume: 0.2, attack: 0.005 })
+    }
+  }
+}
+
+// Single instance — created lazily on first user interaction
+let _sfx = null
+function sfx() {
+  if (!_sfx) _sfx = createSoundEngine()
+  return _sfx
+}
+
+// Helper — call after chess.move() to auto-pick the right sound
+function playSoundForMove(move, chess) {
+  if (!move) return
+  if (chess.isCheckmate())      { sfx().win(); return }   // handled by game-over logic separately
+  if (chess.isCheck())          { sfx().check(); return }
+  if (move.flags.includes('k') || move.flags.includes('q')) { sfx().castle(); return }
+  if (move.captured)            { sfx().capture(); return }
+  sfx().move()
+}
 // ─── CUSTOM CHESS BOARD ───────────────────────────────────────────────────────
 function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap, showHints, lastMove }) {
   const files = ['a','b','c','d','e','f','g','h']
@@ -304,13 +436,14 @@ export default function App() {
         if (!uci) { setBotThinking(false); return }
         const from = uci.slice(0, 2), to = uci.slice(2, 4), promo = uci[4] || 'q'
         try {
-          const move = chess.move({ from, to, promotion: promo })
-          if (move) {
-            setLastMove({ from, to })
-            setMoveHistory(h => [...h, move.san])
-            checkComputerGameOver(chess)
-            bump()
-            if (!chess.isGameOver()) setStatus('⚡️ Your turn!')
+         const move = chess.move({ from, to, promotion: promo })
+        if (move) {
+          playSoundForMove(move, chess)
+          setLastMove({ from, to })
+          setMoveHistory(h => [...h, move.san])
+          checkComputerGameOver(chess)
+          bump()
+          if (!chess.isGameOver()) setStatus('⚡️ Your turn!')
           }
         } catch {}
         setBotThinking(false)
@@ -325,18 +458,21 @@ export default function App() {
     setGameOver(true)
     if (chess.isCheckmate()) {
       const winner = chess.turn() === 'w' ? 'black' : 'white'
-      setStatus(winner === playerColor ? '🏆 You win! Checkmate!' : '💀 Computer wins!')
+      if (winner === playerColor) { sfx().win(); setStatus('🏆 You win! Checkmate!') }
+      else                        { sfx().lose(); setStatus('💀 Computer wins!') }
     } else {
+      sfx().draw()
       setStatus('½ Draw!')
     }
   }
 
-  function startVsComputer() {
+function startVsComputer() {
     chessRef.current = new Chess()
     setGameOver(false); setBotThinking(false); setMoveHistory([])
     setResult(null); setSelectedSq(null); setLegalTargets([]); setLastMove(null)
     setScreen('game')
     setStatus(playerColor === 'white' ? '⚡️ Your turn!' : '🤖 Computer plays first...')
+    sfx().gameStart()
     bump()
   }
 
@@ -351,8 +487,9 @@ export default function App() {
     if (selectedSq && legalTargets.includes(sq)) {
       let move
       try { move = chess.move({ from: selectedSq, to: sq, promotion: 'q' }) }
-      catch { setSelectedSq(null); setLegalTargets([]); return }
-      if (!move) { setSelectedSq(null); setLegalTargets([]); return }
+      catch { setSelectedSq(null); setLegalTargets([]); return } 
+if (!move) { setSelectedSq(null); setLegalTargets([]); return }
+      playSoundForMove(move, chess)
       setLastMove({ from: selectedSq, to: sq })
       setMoveHistory(h => [...h, move.san])
       setSelectedSq(null); setLegalTargets([])
@@ -386,6 +523,7 @@ export default function App() {
       if (!move) { setSelectedSq(null); setLegalTargets([]); return }
 
       // Optimistic update
+      playSoundForMove(move, probe)
       chessRef.current = probe
       setLastMove({ from: selectedSq, to: sq })
       setSelectedSq(null); setLegalTargets([])
