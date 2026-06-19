@@ -12,7 +12,7 @@ const tgUser = tg?.initDataUnsafe?.user || { id: 0, username: 'Player' }
 
 export default function App() {
   const [screen, setScreen]   = useState('home')
-  const [fen, setFen] = useState(START_FEN)
+  const [fen, setFen]         = useState(START_FEN)
   const [status, setStatus]   = useState('')
   const [color, setColor]     = useState(null)
   const [matchId, setMatchId] = useState('')
@@ -22,16 +22,22 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [myTurnUI, setMyTurnUI] = useState(false)
 
-  const chessRef    = useRef(new Chess(START_FEN))
-  const wsRef       = useRef(null)
-  const colorRef    = useRef(null)
-  // waitingRef is now ONLY used for status text ("opponent thinking..."),
-  // not to decide whether to trust the server's FEN. The server's FEN is
-  // ALWAYS authoritative now -- this removes a whole class of desync bugs
-  // where local optimistic state and server state could disagree silently.
-  const waitingRef  = useRef(false)
+  const chessRef   = useRef(new Chess(START_FEN))
+  const wsRef      = useRef(null)
+  const colorRef   = useRef(null)
+  const waitingRef = useRef(false)
 
   useEffect(() => { tg?.ready(); tg?.expand() }, [])
+
+  // Apply an authoritative FEN from the server — single source of truth
+  function applyServerFen(newFen) {
+    try {
+      chessRef.current = new Chess(newFen)
+      setFen(newFen)
+    } catch (e) {
+      console.error('Received invalid FEN from server, ignoring:', newFen, e)
+    }
+  }
 
   async function createMatch() {
     setLoading(true)
@@ -75,25 +81,12 @@ export default function App() {
     setLoading(false)
   }
 
-  // Apply an authoritative FEN coming from the server to both the chess.js
-  // engine and the displayed board. This is now the ONLY way `fen` state
-  // changes once a game is underway -- onDrop no longer writes to `fen`
-  // directly (see onDrop below), so there is exactly one source of truth.
-  function applyServerFen(newFen) {
-    try {
-      chessRef.current = new Chess(newFen)
-      setFen(newFen)
-    } catch (e) {
-      console.error('Received invalid FEN from server, ignoring:', newFen, e)
-    }
-  }
-
   function connect(mid, clr) {
     const sock = new WebSocket(WSS + '/ws/' + mid + '/' + clr)
     wsRef.current = sock
 
     sock.onopen = () => {
-      setStatus(clr === 'white' ? '⏳ Waiting for opponent...' : '⚡ Game on!')
+      setStatus(clr === 'white' ? '⏳ Waiting for opponent...' : '⚡️ Game on!')
     }
 
     sock.onmessage = (evt) => {
@@ -105,16 +98,14 @@ export default function App() {
         setScreen('game')
         const mine = msg.turn === myClr
         setMyTurnUI(mine)
-        setStatus(mine ? '⚡ Your turn!' : '⏳ Waiting for opponent...')
+        setStatus(mine ? '⚡️ Your turn!' : '⏳ Waiting for opponent...')
         waitingRef.current = false
         return
       }
 
       if (msg.type === 'state') {
-        // Server is always authoritative -- always resync the board,
-        // whether this is confirming our own move or reporting the
-        // opponent's. This is the fix for the "piece snaps back" class
-        // of bugs: there is no longer a path where local state silently
+        // Server is always authoritative — always resync the board.
+        // This eliminates any class of bug where local state silently
         // drifts from server state.
         applyServerFen(msg.fen)
         waitingRef.current = false
@@ -123,15 +114,11 @@ export default function App() {
         if (msg.game_over && msg.result) {
           endGame(msg.result, myClr)
         } else {
-          setStatus(mine ? '⚡ Your turn!' : '⏳ Opponent thinking...')
+          setStatus(mine ? '⚡️ Your turn!' : '⏳ Opponent thinking...')
         }
         return
       }
 
-      // Previously unhandled -- this is the new error type the fixed
-      // backend sends back when a move is malformed or illegal, instead
-      // of silently killing the connection. We resync to the FEN the
-      // server gives us (it includes one) and let the player try again.
       if (msg.type === 'error') {
         waitingRef.current = false
         if (msg.fen) applyServerFen(msg.fen)
@@ -158,19 +145,13 @@ export default function App() {
     else setStatus('💀 You lost.')
   }
 
-  // onDrop now does LOCAL validation only as a fast UI check (so illegal
-  // drags bounce back instantly without a network round trip), but it does
-  // NOT write the resulting FEN into `fen` state. The board will only
-  // visually update once the server confirms via a 'state' message. This
-  // means react-chessboard may show a brief "snap back to server position"
-  // if the network is slow, which is intentional and correct: it is never
-  // showing a position the server hasn't confirmed.
+  // onDrop: local validation only as a fast UI check so illegal drags
+  // bounce back instantly. Does NOT write FEN to state — board only
+  // updates once the server confirms via a 'state' message.
   function onDrop(from, to) {
     if (result) return false
-    if (!myTurnUI) return false  // guard against dragging when it's not your turn
+    if (!myTurnUI) return false
 
-    // Validate against a throwaway clone so we never mutate chessRef.current
-    // with a move the server hasn't confirmed yet.
     const probe = new Chess(chessRef.current.fen())
     let move
     try {
@@ -196,9 +177,8 @@ export default function App() {
       return false
     }
 
-    // Returning true lets react-chessboard show the piece at `to` instantly
-    // for responsiveness, but `fen` state itself is untouched until the
-    // server's 'state' message arrives and calls applyServerFen().
+    // Return true so react-chessboard shows the piece at `to` optimistically.
+    // The board will snap to server FEN when the 'state' message arrives.
     return true
   }
 
@@ -209,7 +189,7 @@ export default function App() {
     colorRef.current = null
     waitingRef.current = false
     setScreen('home')
-    setFen(START_FEN)   // FIXED: was 'start', which chess.js v1 / react-chessboard reject as invalid
+    setFen(START_FEN)
     setMyTurnUI(false)
     setColor(null)
     setResult(null)
@@ -249,7 +229,7 @@ export default function App() {
     })
   }
 
-  // HOME
+  // ── HOME ──────────────────────────────────────────────────────────────────
   if (screen === 'home') return (
     <div style={S.page}>
       <div style={{ fontSize: 52 }}>♟</div>
@@ -298,9 +278,12 @@ export default function App() {
         <p style={{ color: '#6B7280', fontSize: '.72rem', fontWeight: 700, letterSpacing: '1px', marginBottom: '10px' }}>
           JOIN WITH MATCH ID
         </p>
-        <input value={joinId} onChange={e => setJoinId(e.target.value)}
+        <input
+          value={joinId}
+          onChange={e => setJoinId(e.target.value)}
           placeholder="Paste match ID here..."
-          style={{ width: '100%', background: '#0f1f3d', border: '1px solid #1a3a5c', borderRadius: '8px', padding: '11px', color: '#eaeaea', fontSize: '.9rem', marginBottom: '10px' }} />
+          style={{ width: '100%', background: '#0f1f3d', border: '1px solid #1a3a5c', borderRadius: '8px', padding: '11px', color: '#eaeaea', fontSize: '.9rem', marginBottom: '10px', boxSizing: 'border-box' }}
+        />
         <button onClick={joinMatch} disabled={loading || !joinId.trim()}
           style={S.btn('linear-gradient(135deg,#3B82F6,#6366F1)', loading || !joinId.trim())}>
           {loading ? 'Joining...' : '🚀 Join Match'}
@@ -315,7 +298,7 @@ export default function App() {
     </div>
   )
 
-  // LOBBY
+  // ── LOBBY ─────────────────────────────────────────────────────────────────
   if (screen === 'lobby') return (
     <div style={S.page}>
       <div style={{ fontSize: 52 }}>⚔️</div>
@@ -339,7 +322,7 @@ export default function App() {
     </div>
   )
 
-  // GAME
+  // ── GAME ──────────────────────────────────────────────────────────────────
   return (
     <div style={{ ...S.page, padding: '10px 10px 28px', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: 460 }}>
@@ -355,7 +338,7 @@ export default function App() {
           borderRadius: 8, padding: '5px 10px', fontSize: '.75rem', fontWeight: 700,
           color: myTurnUI ? '#10B981' : '#A5B4FC'
         }}>
-          {myTurnUI ? '⚡ Your turn' : '⏳ Waiting'}
+          {myTurnUI ? '⚡️ Your turn' : '⏳ Waiting'}
         </div>
       </div>
 
