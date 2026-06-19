@@ -150,7 +150,8 @@ function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap,
           const hasPiece = !!piece
 
           // Square background
-          let bg = isLight ? '#FCD34D' : '#B45309'
+        //  let bg = isLight ? '#FCD34D' : '#B45309'
+        let bg = isLight ? '#F0D9B5' : '#B58863'
           if (isSelected) bg = '#6366F1'
           else if (isLastFrom || isLastTo) bg = isLight ? '#a3e635' : '#65a30d'
 
@@ -205,11 +206,20 @@ function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap,
               {/* Piece */}
               {pieceKey && (
                 <span style={{
-                  fontSize: 'clamp(20px, 6vw, 42px)',
+                 fontSize: 'clamp(22px, 6.5vw, 46px)',
+                  lineHeight: 1,
+                zIndex: 3,
+                filter: isSelected 
+                ? 'brightness(1.3) drop-shadow(0 0 8px rgba(255,215,0,0.9))'
+                : piece.color === 'w'
+                 ? 'drop-shadow(1px 2px 2px rgba(0,0,0,0.6)) brightness(1.15)'
+                 : 'drop-shadow(1px 2px 2px rgba(0,0,0,0.8)) brightness(0.85)',
+        transition: 'filter 0.1s'
+                 /* fontSize: 'clamp(20px, 6vw, 42px)',
                   lineHeight: 1,
                   zIndex: 3,
                   filter: isSelected ? 'brightness(1.4) drop-shadow(0 0 6px rgba(255,255,255,0.8))' : 'drop-shadow(1px 1px 1px rgba(0,0,0,0.5))',
-                  transition: 'filter 0.1s'
+                  transition: 'filter 0.1s'*/
                 }}>
                   {PIECES[pieceKey]}
                 </span>
