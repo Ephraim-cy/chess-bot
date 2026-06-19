@@ -196,12 +196,13 @@ function fetchAIMove(fen, difficulty) {
 }
 
 // ─── SOUND ENGINE (Web Audio API — no libraries needed) ──────────────────────
-//const AudioCtx = window.AudioContext || window.webkitAudioContext
+const AudioCtx = window.AudioContext || window.webkitAudioContext
 function createSoundEngine() {
   let ctx = null
 
   
   function getCtx() {
+    if (!AudioCtx) return null
     if (!ctx) ctx = new AudioCtx()
     // Resume if suspended (browser autoplay policy)
     if (ctx.state === 'suspended') ctx.resume()
@@ -927,7 +928,9 @@ export default function App() {
     fetch(API + '/api/me', { headers: { 'x-init-data': initData } })
       .then(r => r.json())
       .then(data => {
-        if (data?.balance !== undefined) setUserBalance(data.balance)
+        if (data?.balance?.playable !== undefined) {
+          setUserBalance(data.balance.playable)
+        }
       })
       .catch(() => {}) // Silent fail — app still works, just no balance shown
   }, [])

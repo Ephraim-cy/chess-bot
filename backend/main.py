@@ -82,11 +82,14 @@ async def get_my_profile(x_init_data: str = Header(default="test")):
     user = get_or_create_user(tg_id, username)
 
     return {
-        "telegram_id": tg_id,
-        "username":    username,
-        "balance":     get_balance(tg_id),
+        "id":               user.id,
+        "telegram_id":      tg_id,
+        "username":         username,
+        "playable_balance": float(user.playable_balance),
+        "locked_balance":   float(user.locked_balance),
+        "status":           user.status,
+        "balance":          get_balance(tg_id),
     }
-
 
 @app.get("/api/balance")
 async def check_balance(x_init_data: str = Header(default="test")):
