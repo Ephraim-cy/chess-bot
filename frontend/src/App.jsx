@@ -109,7 +109,7 @@ function fetchAIMove(fen, difficulty) {
         if (isMax ? score > bestScore : score < bestScore) { bestScore = score; bestMove = move }
       }
       resolve(bestMove.from + bestMove.to + (bestMove.promotion || ''))
-    }, 50)
+    }, 100)
   })
 }
 
