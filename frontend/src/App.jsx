@@ -14,33 +14,6 @@ const PIECES = {
   bK:'♚', bQ:'♛', bR:'♜', bB:'♝', bN:'♞', bP:'♟'
 }
 
-/*// ─── AI MOVE ──────────────────────────────────────────────────────────────────
-async function fetchAIMove(fen, difficulty) {
-  const chess = new Chess(fen)
-  const legal = chess.moves({ verbose: true }).map(m => m.from + m.to + (m.promotion || ''))
-  if (!legal.length) return null
-  if (difficulty === 'easy') return legal[Math.floor(Math.random() * legal.length)]
-
-  const prompt = `You are a ${difficulty === 'hard' ? 'strong' : 'intermediate'} chess player.
-FEN: ${fen}
-Legal moves (UCI): ${legal.join(', ')}
-Reply with ONLY one move string from the list. Nothing else.`
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6', max_tokens: 16,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    })
-    const data = await res.json()
-    const raw = (data?.content?.[0]?.text || '').trim().toLowerCase().replace(/[^a-h1-8qrbn]/g, '')
-    if (raw && legal.includes(raw)) return raw
-  } catch {}
-  return legal[Math.floor(Math.random() * legal.length)]
-}*/
 // ─── LOCAL CHESS ENGINE (minimax — instant, no API) ──────────────────────────
 const PIECE_VALUE = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 }
 
@@ -316,65 +289,36 @@ export default function App() {
   function bump() { setTick(t => t + 1) }
 
   useEffect(() => { tg?.ready(); tg?.expand() }, [])
-/*
   // ─── VS COMPUTER: bot move trigger ────────────────────────────────────────
-  useEffect(() => {
-    if (screen !== 'game' || mode !== 'computer' || gameOver || botThinking) return
-    const chess = chessRef.current
-    const botCol = playerColor === 'white' ? 'b' : 'w'
-    if (chess.turn() !== botCol || chess.isGameOver()) return
-
-    let cancelled = false
-    setBotThinking(true)
-    setStatus('🤖 Computer thinking...')
-
-    fetchAIMove(chess.fen(), difficulty).then(uci => {
-      if (cancelled) return
-      if (!uci) { setBotThinking(false); return }
-      const from = uci.slice(0, 2), to = uci.slice(2, 4), promo = uci[4] || 'q'
-      try {
-        const move = chess.move({ from, to, promotion: promo })
-        if (move) {
-          setLastMove({ from, to })
-          setMoveHistory(h => [...h, move.san])
-          checkComputerGameOver(chess)
-        }
-      } catch {}
-      setBotThinking(false)
-      bump()
-      if (!chess.isGameOver()) setStatus('⚡️ Your turn!')
-    })
-    return () => { cancelled = true }*/
-    // ─── VS COMPUTER: bot move trigger ────────────────────────────────────────
   useEffect(() => {
     if (screen !== 'game' || mode !== 'computer' || gameOver) return
     const chess = chessRef.current
     const botCol = playerColor === 'white' ? 'b' : 'w'
     if (chess.turn() !== botCol || chess.isGameOver()) return
 
+    setBotThinking(true)
     setStatus('🤖 Computer thinking...')
 
     const timer = setTimeout(() => {
-      const uci = getBotMove(chess.fen(), difficulty)
-      if (!uci) return
-      const from = uci.slice(0, 2), to = uci.slice(2, 4), promo = uci[4] || 'q'
-      try {
-        const move = chess.move({ from, to, promotion: promo })
-        if (move) {
-          setLastMove({ from, to })
-          setMoveHistory(h => [...h, move.san])
-          checkComputerGameOver(chess)
-          bump()
-          if (!chess.isGameOver()) setStatus('⚡️ Your turn!')
-        }
-      } catch {}
+      fetchAIMove(chess.fen(), difficulty).then(uci => {
+        if (!uci) { setBotThinking(false); return }
+        const from = uci.slice(0, 2), to = uci.slice(2, 4), promo = uci[4] || 'q'
+        try {
+          const move = chess.move({ from, to, promotion: promo })
+          if (move) {
+            setLastMove({ from, to })
+            setMoveHistory(h => [...h, move.san])
+            checkComputerGameOver(chess)
+            bump()
+            if (!chess.isGameOver()) setStatus('⚡️ Your turn!')
+          }
+        } catch {}
+        setBotThinking(false)
+      })
     }, 300)
 
     return () => clearTimeout(timer)
   }, [tick, screen, mode, gameOver, playerColor, difficulty])
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  //}, [tick, screen, mode, gameOver, botThinking])
 
   function checkComputerGameOver(chess) {
     if (!chess.isGameOver()) return
