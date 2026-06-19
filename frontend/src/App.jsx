@@ -367,10 +367,11 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
           const isCheckedKing = sq === checkedKingSq
           const hasPiece = !!piece
 
-          // Square background — priority: selected > check > last move > normal
+          // Square background
+          const isCheckedKing = sq === checkedKingSq
           let bg = isLight ? '#FCD34D' : '#B45309'
-          if (isSelected)              bg = '#6366F1'
-          else if (isCheckedKing)      bg = '#EF4444'
+          if (isSelected)           bg = '#6366F1'
+          else if (isCheckedKing)   bg = '#EF4444'                          // red — king in check
           else if (isLastFrom || isLastTo) bg = isLight ? '#a3e635' : '#65a30d'
 
           return (
@@ -390,7 +391,7 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              {/* Legal move indicator */}
+               {/* Legal move indicator */}
               {isLegal && (
                 <div style={{
                   position: 'absolute',
@@ -402,6 +403,7 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
                   zIndex: 2
                 }}>
                   {hasPiece ? (
+                    // Capture ring
                     <div style={{
                       width: '90%', height: '90%',
                       borderRadius: '50%',
@@ -409,6 +411,7 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
                       boxSizing: 'border-box'
                     }} />
                   ) : (
+                    // Move dot
                     <div style={{
                       width: showHints ? '44%' : '30%',
                       height: showHints ? '44%' : '30%',
@@ -425,11 +428,7 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
                   fontSize: 'clamp(20px, 6vw, 42px)',
                   lineHeight: 1,
                   zIndex: 3,
-                  filter: isSelected
-                    ? 'brightness(1.4) drop-shadow(0 0 6px rgba(255,255,255,0.8))'
-                    : isCheckedKing
-                    ? 'drop-shadow(0 0 8px rgba(239,68,68,0.9))'
-                    : 'drop-shadow(1px 1px 1px rgba(0,0,0,0.5))',
+                  filter: isSelected ? 'brightness(1.4) drop-shadow(0 0 6px rgba(255,255,255,0.8))' : 'drop-shadow(1px 1px 1px rgba(0,0,0,0.5))',
                   transition: 'filter 0.1s'
                 }}>
                   {PIECES[pieceKey]}
