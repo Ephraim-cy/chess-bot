@@ -14,7 +14,7 @@ const PIECES = {
   bK:'♚', bQ:'♛', bR:'♜', bB:'♝', bN:'♞', bP:'♟'
 }
 
-// ─── AI MOVE ──────────────────────────────────────────────────────────────────
+/*// ─── AI MOVE ──────────────────────────────────────────────────────────────────
 async function fetchAIMove(fen, difficulty) {
   const chess = new Chess(fen)
   const legal = chess.moves({ verbose: true }).map(m => m.from + m.to + (m.promotion || ''))
@@ -40,6 +40,77 @@ Reply with ONLY one move string from the list. Nothing else.`
     if (raw && legal.includes(raw)) return raw
   } catch {}
   return legal[Math.floor(Math.random() * legal.length)]
+}*/
+// ─── LOCAL CHESS ENGINE (minimax — instant, no API) ──────────────────────────
+const PIECE_VALUE = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 }
+
+const PST = {
+  p: [ 0,0,0,0,0,0,0,0, 50,50,50,50,50,50,50,50, 10,10,20,30,30,20,10,10, 5,5,10,25,25,10,5,5, 0,0,0,20,20,0,0,0, 5,-5,-10,0,0,-10,-5,5, 5,10,10,-20,-20,10,10,5, 0,0,0,0,0,0,0,0 ],
+  n: [ -50,-40,-30,-30,-30,-30,-40,-50, -40,-20,0,0,0,0,-20,-40, -30,0,10,15,15,10,0,-30, -30,5,15,20,20,15,5,-30, -30,0,15,20,20,15,0,-30, -30,5,10,15,15,10,5,-30, -40,-20,0,5,5,0,-20,-40, -50,-40,-30,-30,-30,-30,-40,-50 ],
+  b: [ -20,-10,-10,-10,-10,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,10,10,5,0,-10, -10,5,5,10,10,5,5,-10, -10,0,10,10,10,10,0,-10, -10,10,10,10,10,10,10,-10, -10,5,0,0,0,0,5,-10, -20,-10,-10,-10,-10,-10,-10,-20 ],
+  r: [ 0,0,0,0,0,0,0,0, 5,10,10,10,10,10,10,5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, 0,0,0,5,5,0,0,0 ],
+  q: [ -20,-10,-10,-5,-5,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,5,5,5,0,-10, -5,0,5,5,5,5,0,-5, 0,0,5,5,5,5,0,-5, -10,5,5,5,5,5,0,-10, -10,0,5,0,0,0,0,-10, -20,-10,-10,-5,-5,-10,-10,-20 ],
+  k: [ -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -20,-30,-30,-40,-40,-30,-30,-20, -10,-20,-20,-20,-20,-20,-20,-10, 20,20,0,0,0,0,20,20, 20,30,10,0,0,10,30,20 ]
+}
+
+function evaluateBoard(chess) {
+  if (chess.isCheckmate()) return chess.turn() === 'w' ? -99999 : 99999
+  if (chess.isDraw()) return 0
+  let score = 0
+  chess.board().forEach((row, ri) => {
+    row.forEach((piece, fi) => {
+      if (!piece) return
+      const pstIdx = piece.color === 'w' ? (7 - ri) * 8 + fi : ri * 8 + fi
+      const val = PIECE_VALUE[piece.type] + (PST[piece.type]?.[pstIdx] || 0)
+      score += piece.color === 'w' ? val : -val
+    })
+  })
+  return score
+}
+
+function minimax(chess, depth, alpha, beta, maximizing) {
+  if (depth === 0 || chess.isGameOver()) return evaluateBoard(chess)
+  const moves = chess.moves()
+  if (maximizing) {
+    let best = -Infinity
+    for (const move of moves) {
+      chess.move(move); best = Math.max(best, minimax(chess, depth-1, alpha, beta, false)); chess.undo()
+      alpha = Math.max(alpha, best); if (beta <= alpha) break
+    }
+    return best
+  } else {
+    let best = Infinity
+    for (const move of moves) {
+      chess.move(move); best = Math.min(best, minimax(chess, depth-1, alpha, beta, true)); chess.undo()
+      beta = Math.min(beta, best); if (beta <= alpha) break
+    }
+    return best
+  }
+}
+
+function fetchAIMove(fen, difficulty) {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      const chess = new Chess(fen)
+      const moves = chess.moves({ verbose: true })
+      if (!moves.length) return resolve(null)
+      if (difficulty === 'easy') {
+        const m = moves[Math.floor(Math.random() * moves.length)]
+        return resolve(m.from + m.to + (m.promotion || ''))
+      }
+      const depth = difficulty === 'hard' ? 3 : 2
+      const isMax = chess.turn() === 'w'
+      let bestScore = isMax ? -Infinity : Infinity, bestMove = moves[0]
+      for (let i = moves.length-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [moves[i],moves[j]]=[moves[j],moves[i]] }
+      for (const move of moves) {
+        chess.move(move)
+        const score = minimax(chess, depth-1, -Infinity, Infinity, !isMax)
+        chess.undo()
+        if (isMax ? score > bestScore : score < bestScore) { bestScore = score; bestMove = move }
+      }
+      resolve(bestMove.from + bestMove.to + (bestMove.promotion || ''))
+    }, 50)
+  })
 }
 
 // ─── CUSTOM CHESS BOARD ───────────────────────────────────────────────────────
