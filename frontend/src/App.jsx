@@ -92,11 +92,13 @@ function minimax(chess, depth, alpha, beta, maximizing) {
     return best
   }
 }
-
+//importScripts('https://unpkg.com/chess.js@1.0.0-beta.6')
+//const PIECE_VALUE = { p:100, n:320, b:330, r:500, q:900, k:20000 }
+//const PST = {
 // ─── WEB WORKER: minimax runs off main thread — UI stays fluid ────────────────
 // Inline blob worker — no extra file needed, works on Vercel/any static host
 const WORKER_CODE = `
-importScripts('https://cdn.jsdelivr.net/npm/chess.js@1.0.0/dist/cjs/chess.js')
+importScripts('https://unpkg.com/chess.js@1.0.0-beta.6')
 
 const PIECE_VALUE = { p:100, n:320, b:330, r:500, q:900, k:20000 }
 const PST = {
@@ -144,6 +146,7 @@ function minimax(chess, depth, alpha, beta, max) {
 self.onmessage = function(e) {
   const { fen, difficulty } = e.data
   const chess = new Chess(fen)
+  const chess = new Chess.Chess(fen)
   const moves = chess.moves({ verbose: true })
   if (!moves.length) { self.postMessage(null); return }
   if (difficulty === 'easy') {
