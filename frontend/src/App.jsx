@@ -92,13 +92,11 @@ function minimax(chess, depth, alpha, beta, maximizing) {
     return best
   }
 }
-//importScripts('https://unpkg.com/chess.js@1.0.0-beta.6')
-//const PIECE_VALUE = { p:100, n:320, b:330, r:500, q:900, k:20000 }
-//const PST = {
+
 // ─── WEB WORKER: minimax runs off main thread — UI stays fluid ────────────────
 // Inline blob worker — no extra file needed, works on Vercel/any static host
 const WORKER_CODE = `
-importScripts('https://unpkg.com/chess.js@1.0.0-beta.6')
+importScripts('https://cdn.jsdelivr.net/npm/chess.js@1.0.0/dist/cjs/chess.js')
 
 const PIECE_VALUE = { p:100, n:320, b:330, r:500, q:900, k:20000 }
 const PST = {
@@ -146,7 +144,6 @@ function minimax(chess, depth, alpha, beta, max) {
 self.onmessage = function(e) {
   const { fen, difficulty } = e.data
   const chess = new Chess(fen)
-  const chess = new Chess.Chess(fen)
   const moves = chess.moves({ verbose: true })
   if (!moves.length) { self.postMessage(null); return }
   if (difficulty === 'easy') {
@@ -367,11 +364,10 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
           const isCheckedKing = sq === checkedKingSq
           const hasPiece = !!piece
 
-          // Square background
-          const isCheckedKing = sq === checkedKingSq
+          // Square background — priority: selected > check > last move > normal
           let bg = isLight ? '#FCD34D' : '#B45309'
-          if (isSelected)           bg = '#6366F1'
-          else if (isCheckedKing)   bg = '#EF4444'                          // red — king in check
+          if (isSelected)              bg = '#6366F1'
+          else if (isCheckedKing)      bg = '#EF4444'
           else if (isLastFrom || isLastTo) bg = isLight ? '#a3e635' : '#65a30d'
 
           return (
@@ -391,7 +387,7 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-               {/* Legal move indicator */}
+              {/* Legal move indicator */}
               {isLegal && (
                 <div style={{
                   position: 'absolute',
@@ -403,7 +399,6 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
                   zIndex: 2
                 }}>
                   {hasPiece ? (
-                    // Capture ring
                     <div style={{
                       width: '90%', height: '90%',
                       borderRadius: '50%',
@@ -411,7 +406,6 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
                       boxSizing: 'border-box'
                     }} />
                   ) : (
-                    // Move dot
                     <div style={{
                       width: showHints ? '44%' : '30%',
                       height: showHints ? '44%' : '30%',
@@ -428,7 +422,11 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
                   fontSize: 'clamp(20px, 6vw, 42px)',
                   lineHeight: 1,
                   zIndex: 3,
-                  filter: isSelected ? 'brightness(1.4) drop-shadow(0 0 6px rgba(255,255,255,0.8))' : 'drop-shadow(1px 1px 1px rgba(0,0,0,0.5))',
+                  filter: isSelected
+                    ? 'brightness(1.4) drop-shadow(0 0 6px rgba(255,255,255,0.8))'
+                    : isCheckedKing
+                    ? 'drop-shadow(0 0 8px rgba(239,68,68,0.9))'
+                    : 'drop-shadow(1px 1px 1px rgba(0,0,0,0.5))',
                   transition: 'filter 0.1s'
                 }}>
                   {PIECES[pieceKey]}
@@ -930,7 +928,7 @@ export default function App() {
     fetch(API + '/api/me', { headers: { 'x-init-data': initData } })
       .then(r => r.json())
       .then(data => {
-        if (data?.balance?.playable !== undefined) {
+                if (data?.balance?.playable !== undefined) {
           setUserBalance(data.balance.playable)
         }
       })
