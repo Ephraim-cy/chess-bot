@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Chess } from 'chess.js'
 
 const API = 'https://chess-bot-production-efa2.up.railway.app'
@@ -93,28 +93,105 @@ function minimax(chess, depth, alpha, beta, maximizing) {
   }
 }
 
+// ─── WEB WORKER: minimax runs off main thread — UI stays fluid ────────────────
+// Inline blob worker — no extra file needed, works on Vercel/any static host
+const WORKER_CODE = `
+importScripts('https://cdn.jsdelivr.net/npm/chess.js@1.0.0/dist/cjs/chess.js')
+
+const PIECE_VALUE = { p:100, n:320, b:330, r:500, q:900, k:20000 }
+const PST = {
+  p:[0,0,0,0,0,0,0,0,50,50,50,50,50,50,50,50,10,10,20,30,30,20,10,10,5,5,10,25,25,10,5,5,0,0,0,20,20,0,0,0,5,-5,-10,0,0,-10,-5,5,5,10,10,-20,-20,10,10,5,0,0,0,0,0,0,0,0],
+  n:[-50,-40,-30,-30,-30,-30,-40,-50,-40,-20,0,0,0,0,-20,-40,-30,0,10,15,15,10,0,-30,-30,5,15,20,20,15,5,-30,-30,0,15,20,20,15,0,-30,-30,5,10,15,15,10,5,-30,-40,-20,0,5,5,0,-20,-40,-50,-40,-30,-30,-30,-30,-40,-50],
+  b:[-20,-10,-10,-10,-10,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,10,10,5,0,-10,-10,5,5,10,10,5,5,-10,-10,0,10,10,10,10,0,-10,-10,10,10,10,10,10,10,-10,-10,5,0,0,0,0,5,-10,-20,-10,-10,-10,-10,-10,-10,-20],
+  r:[0,0,0,0,0,0,0,0,5,10,10,10,10,10,10,5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,0,0,0,5,5,0,0,0],
+  q:[-20,-10,-10,-5,-5,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,5,5,5,0,-10,-5,0,5,5,5,5,0,-5,0,0,5,5,5,5,0,-5,-10,5,5,5,5,5,0,-10,-10,0,5,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20],
+  k:[-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20]
+}
+
+function evaluate(chess) {
+  if (chess.isCheckmate()) return chess.turn()==='w' ? -99999 : 99999
+  if (chess.isDraw()) return 0
+  let score = 0
+  chess.board().forEach((row,ri) => row.forEach((p,fi) => {
+    if (!p) return
+    const idx = p.color==='w' ? (7-ri)*8+fi : ri*8+fi
+    const v = PIECE_VALUE[p.type] + (PST[p.type]?.[idx]||0)
+    score += p.color==='w' ? v : -v
+  }))
+  return score
+}
+
+function minimax(chess, depth, alpha, beta, max) {
+  if (depth===0||chess.isGameOver()) return evaluate(chess)
+  const moves = chess.moves()
+  if (max) {
+    let best=-Infinity
+    for (const m of moves) {
+      chess.move(m); best=Math.max(best,minimax(chess,depth-1,alpha,beta,false)); chess.undo()
+      alpha=Math.max(alpha,best); if(beta<=alpha) break
+    }
+    return best
+  } else {
+    let best=Infinity
+    for (const m of moves) {
+      chess.move(m); best=Math.min(best,minimax(chess,depth-1,alpha,beta,true)); chess.undo()
+      beta=Math.min(beta,best); if(beta<=alpha) break
+    }
+    return best
+  }
+}
+
+self.onmessage = function(e) {
+  const { fen, difficulty } = e.data
+  const chess = new Chess(fen)
+  const moves = chess.moves({ verbose: true })
+  if (!moves.length) { self.postMessage(null); return }
+  if (difficulty === 'easy') {
+    const m = moves[Math.floor(Math.random()*moves.length)]
+    self.postMessage(m.from+m.to+(m.promotion||'')); return
+  }
+  const depth = difficulty==='hard' ? 3 : 2
+  const isMax = chess.turn()==='w'
+  // Shuffle for variety
+  for (let i=moves.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[moves[i],moves[j]]=[moves[j],moves[i]]}
+  let bestScore=isMax?-Infinity:Infinity, bestMove=moves[0]
+  for (const move of moves) {
+    chess.move(move)
+    const score=minimax(chess,depth-1,-Infinity,Infinity,!isMax)
+    chess.undo()
+    if (isMax?score>bestScore:score<bestScore){bestScore=score;bestMove=move}
+  }
+  self.postMessage(bestMove.from+bestMove.to+(bestMove.promotion||''))
+}
+`
+
+// Create worker once — reuse across all moves
+let _worker = null
+function getWorker() {
+  if (_worker) return _worker
+  const blob = new Blob([WORKER_CODE], { type: 'application/javascript' })
+  _worker = new Worker(URL.createObjectURL(blob))
+  return _worker
+}
+
 function fetchAIMove(fen, difficulty) {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      const chess = new Chess(fen)
-      const moves = chess.moves({ verbose: true })
-      if (!moves.length) return resolve(null)
-      if (difficulty === 'easy') {
-        const m = moves[Math.floor(Math.random() * moves.length)]
-        return resolve(m.from + m.to + (m.promotion || ''))
-      }
-      const depth = difficulty === 'hard' ? 3 : 2
-      const isMax = chess.turn() === 'w'
-      let bestScore = isMax ? -Infinity : Infinity, bestMove = moves[0]
-      for (let i = moves.length-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [moves[i],moves[j]]=[moves[j],moves[i]] }
-      for (const move of moves) {
-        chess.move(move)
-        const score = minimax(chess, depth-1, -Infinity, Infinity, !isMax)
-        chess.undo()
-        if (isMax ? score > bestScore : score < bestScore) { bestScore = score; bestMove = move }
-      }
-      resolve(bestMove.from + bestMove.to + (bestMove.promotion || ''))
-    }, 100)
+  return new Promise((resolve, reject) => {
+    try {
+      const worker = getWorker()
+      // Each call gets a one-time message handler, then removes itself
+      const handler = (e) => { worker.removeEventListener('message', handler); resolve(e.data) }
+      worker.addEventListener('message', handler)
+      worker.postMessage({ fen, difficulty })
+    } catch {
+      // Worker failed (e.g. some browsers block blob workers) — fall back to main thread
+      setTimeout(() => {
+        const chess = new Chess(fen)
+        const moves = chess.moves({ verbose: true })
+        if (!moves.length) return resolve(null)
+        if (difficulty === 'easy') { const m = moves[Math.floor(Math.random()*moves.length)]; return resolve(m.from+m.to+(m.promotion||'')) }
+        resolve(moves[0].from + moves[0].to)
+      }, 50)
+    }
   })
 }
 
@@ -251,7 +328,143 @@ function playSoundForMove(move, chess) {
   sfx().move()
 }
 // ─── CUSTOM CHESS BOARD ───────────────────────────────────────────────────────
-function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap, showHints, lastMove, checkedKingSq }) {
+const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap, showHints, lastMove, checkedKingSq }) {
+  const files = ['a','b','c','d','e','f','g','h']
+  const ranks = ['8','7','6','5','4','3','2','1']
+
+  const displayFiles = orientation === 'black' ? [...files].reverse() : files
+  const displayRanks = orientation === 'black' ? [...ranks].reverse() : ranks
+
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(8, 1fr)',
+      width: '100%',
+      aspectRatio: '1 / 1',
+      borderRadius: 6,
+      overflow: 'hidden',
+      boxShadow: '0 8px 32px rgba(0,0,0,.7)',
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      touchAction: 'manipulation'
+    }}>
+      {displayRanks.map(rank =>
+        displayFiles.map(file => {
+          const sq = file + rank
+          const fileIdx = files.indexOf(file)
+          const rankIdx = ranks.indexOf(rank)
+          const isLight = (fileIdx + rankIdx) % 2 === 0
+          const piece = chess.get(sq)
+          const pieceKey = piece ? piece.color + piece.type.toUpperCase() : null
+          const isSelected = sq === selectedSq
+          const isLegal = legalTargets.includes(sq)
+          const isLastFrom = lastMove && lastMove.from === sq
+          const isLastTo   = lastMove && lastMove.to === sq
+          const isCheckedKing = sq === checkedKingSq
+          const hasPiece = !!piece
+
+          // Square background — priority: selected > check > last move > normal
+          let bg = isLight ? '#FCD34D' : '#B45309'
+          if (isSelected)              bg = '#6366F1'
+          else if (isCheckedKing)      bg = '#EF4444'
+          else if (isLastFrom || isLastTo) bg = isLight ? '#a3e635' : '#65a30d'
+
+          return (
+            <div
+              key={sq}
+              onPointerDown={(e) => {
+                e.preventDefault()
+                onSquareTap(sq)
+              }}
+              style={{
+                position: 'relative',
+                background: bg,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {/* Legal move indicator */}
+              {isLegal && (
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
+                  zIndex: 2
+                }}>
+                  {hasPiece ? (
+                    <div style={{
+                      width: '90%', height: '90%',
+                      borderRadius: '50%',
+                      border: showHints ? '4px solid rgba(16,185,129,0.85)' : '3px solid rgba(255,255,255,0.4)',
+                      boxSizing: 'border-box'
+                    }} />
+                  ) : (
+                    <div style={{
+                      width: showHints ? '44%' : '30%',
+                      height: showHints ? '44%' : '30%',
+                      borderRadius: '50%',
+                      background: showHints ? 'rgba(16,185,129,0.8)' : 'rgba(255,255,255,0.35)'
+                    }} />
+                  )}
+                </div>
+              )}
+
+              {/* Piece */}
+              {pieceKey && (
+                <span style={{
+                  fontSize: 'clamp(20px, 6vw, 42px)',
+                  lineHeight: 1,
+                  zIndex: 3,
+                  filter: isSelected
+                    ? 'brightness(1.4) drop-shadow(0 0 6px rgba(255,255,255,0.8))'
+                    : isCheckedKing
+                    ? 'drop-shadow(0 0 8px rgba(239,68,68,0.9))'
+                    : 'drop-shadow(1px 1px 1px rgba(0,0,0,0.5))',
+                  transition: 'filter 0.1s'
+                }}>
+                  {PIECES[pieceKey]}
+                </span>
+              )}
+
+              {/* Rank/File labels on edge squares */}
+              {file === displayFiles[0] && (
+                <span style={{ position: 'absolute', top: 2, left: 3, fontSize: 9, fontWeight: 700, color: isLight ? '#B45309' : '#FCD34D', opacity: 0.7, lineHeight: 1 }}>
+                  {rank}
+                </span>
+              )}
+              {rank === displayRanks[7] && (
+                <span style={{ position: 'absolute', bottom: 2, right: 3, fontSize: 9, fontWeight: 700, color: isLight ? '#B45309' : '#FCD34D', opacity: 0.7, lineHeight: 1 }}>
+                  {file}
+                </span>
+              )}
+            </div>
+          )
+        })
+      )}
+    </div>
+  )
+}, (prev, next) => {
+  // Custom comparator — only re-render when chess-relevant props actually changed.
+  // This stops the entire 64-square board re-rendering on every unrelated state update.
+  return (
+    prev.chess.fen()           === next.chess.fen()        &&
+    prev.selectedSq            === next.selectedSq         &&
+    prev.checkedKingSq         === next.checkedKingSq      &&
+    prev.lastMove?.from        === next.lastMove?.from     &&
+    prev.lastMove?.to          === next.lastMove?.to       &&
+    prev.legalTargets.join()   === next.legalTargets.join() &&
+    prev.orientation           === next.orientation        &&
+    prev.showHints             === next.showHints
+  )
+})
+/*// ─── CUSTOM CHESS BOARD ───────────────────────────────────────────────────────
+const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap, showHints, lastMove, checkedKingSq }) {
   const files = ['a','b','c','d','e','f','g','h']
   const ranks = ['8','7','6','5','4','3','2','1']
 
@@ -310,7 +523,7 @@ function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap,
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              {/* Legal move indicator */}
+              {/* Legal move indicator }
               {isLegal && (
                 <div style={{
                   position: 'absolute',
@@ -341,7 +554,7 @@ function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap,
                 </div>
               )}
 
-              {/* Piece */}
+              {/* Piece }
               {pieceKey && (
                 <span style={{
                   fontSize: 'clamp(20px, 6vw, 42px)',
@@ -354,7 +567,7 @@ function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap,
                 </span>
               )}
 
-              {/* Rank/File labels on edge squares */}
+              {/* Rank/File labels on edge squares }
               {file === displayFiles[0] && (
                 <span style={{ position: 'absolute', top: 2, left: 3, fontSize: 9, fontWeight: 700, color: isLight ? '#B45309' : '#FCD34D', opacity: 0.7, lineHeight: 1 }}>
                   {rank}
@@ -371,7 +584,7 @@ function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap,
       )}
     </div>
   )
-}
+}*/
 
 // ─── PROFILE SCREEN ───────────────────────────────────────────────────────────
 function ProfileScreen({ onBack }) {
@@ -666,8 +879,9 @@ export default function App() {
   const [screen, setScreen]   = useState('home')
   const helpFromRef           = useRef('home')
   const [mode, setMode]       = useState('human')
-  const [currency, setCurrency] = useState('USDT')
-  const [stake, setStake]       = useState(5)
+  const [currency, setCurrency]   = useState('USDT')
+  const [stake, setStake]         = useState(5)
+  const [userBalance, setUserBalance] = useState(null)
   const [status, setStatus]   = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -677,6 +891,12 @@ export default function App() {
   const [color, setColor]       = useState(null)
   const [result, setResult]     = useState(null)
   const [myTurnUI, setMyTurnUI] = useState(false)
+
+// matchmaking queue
+  const [inQueue, setInQueue]         = useState(false)
+  const [queueSeconds, setQueueSeconds] = useState(0)
+  const queueTimerRef                 = useRef(null)
+  const queueWsRef                    = useRef(null)
 
   // vs computer
   const [playerColor, setPlayerColor] = useState('white')
@@ -698,7 +918,19 @@ export default function App() {
 
   function bump() { setTick(t => t + 1) }
 
-  useEffect(() => { tg?.ready(); tg?.expand() }, [])
+  // ─── AUTO-REGISTER: runs once on load ─────────────────────────────────────
+  // Calls /api/me — backend creates user row if first visit, returns profile if existing.
+  // Silent — user never sees a "sign up" screen.
+  useEffect(() => {
+    tg?.ready(); tg?.expand()
+    const initData = tg?.initData || 'test'
+    fetch(API + '/api/me', { headers: { 'x-init-data': initData } })
+      .then(r => r.json())
+      .then(data => {
+        if (data?.balance !== undefined) setUserBalance(data.balance)
+      })
+      .catch(() => {}) // Silent fail — app still works, just no balance shown
+  }, [])
   // ─── VS COMPUTER: bot move trigger ────────────────────────────────────────
   useEffect(() => {
     if (screen !== 'game' || mode !== 'computer' || gameOver) return
@@ -863,6 +1095,54 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
     setLoading(false)
   }
 
+// ─── MATCHMAKING QUEUE ────────────────────────────────────────────────────
+  function findMatch() {
+    setInQueue(true); setQueueSeconds(0); setStatus('🔍 Finding opponent...')
+    setScreen('queue')
+
+    // Timer — counts seconds while searching
+    queueTimerRef.current = setInterval(() => setQueueSeconds(s => s + 1), 1000)
+
+    const initData = tg?.initData || 'test'
+    // WebSocket to matchmaking endpoint — server notifies when paired
+    const ws = new WebSocket(`${WSS}/ws/queue/${stake}/${currency}?init=${encodeURIComponent(initData)}`)
+    queueWsRef.current = ws
+
+    ws.onmessage = (evt) => {
+      const msg = JSON.parse(evt.data)
+      if (msg.type === 'matched') {
+        // Server found us an opponent — jump straight into the game
+        clearInterval(queueTimerRef.current)
+        setInQueue(false)
+        colorRef.current = msg.color; setColor(msg.color)
+        setMatchId(msg.match_id)
+        setScreen('game')
+        connect(msg.match_id, msg.color)
+        setStatus(msg.color === 'white' ? '⚡️ Your turn!' : '⏳ Opponent goes first...')
+      }
+      if (msg.type === 'waiting') {
+        setStatus(`🔍 Searching... ${msg.in_queue} player(s) in queue`)
+      }
+      if (msg.type === 'timeout') {
+        cancelQueue()
+        setStatus('⏱ No opponent found. Try again.')
+        setScreen('home')
+      }
+    }
+    ws.onclose = () => {
+      if (inQueue) { cancelQueue(); setScreen('home') }
+    }
+    ws.onerror = () => {
+      cancelQueue(); setStatus('❌ Queue error. Try again.'); setScreen('home')
+    }
+  }
+
+  function cancelQueue() {
+    clearInterval(queueTimerRef.current)
+    if (queueWsRef.current) { queueWsRef.current.close(); queueWsRef.current = null }
+    setInQueue(false); setQueueSeconds(0)
+  }
+
   function connect(mid, clr) {
     const sock = new WebSocket(WSS + '/ws/' + mid + '/' + clr)
     wsRef.current = sock
@@ -955,7 +1235,14 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         CHESS ARENA
       </h1>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <p style={{ color: '#6B7280', fontSize: '.8rem', margin: 0 }}>@{tgUser.username || 'Player'}</p>
+        <p style={{ color: '#6B7280', fontSize: '.8rem', margin: 0 }}>
+        @{tgUser.username || 'Player'}
+        {userBalance !== null && (
+          <span style={{ color: '#10B981', fontWeight: 700, marginLeft: 8 }}>
+            ${userBalance.toFixed(2)}
+          </span>
+        )}
+      </p>
         <button onPointerDown={() => { helpFromRef.current = 'home'; setScreen('help') }}
           style={{ background: 'rgba(99,102,241,.15)', border: '1px solid rgba(99,102,241,.3)', color: '#818CF8', borderRadius: '50%', width: 28, height: 28, fontWeight: 800, fontSize: '.85rem', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}>
           ?
@@ -1029,6 +1316,15 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
             <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>You Win</div><div style={{ color: '#10B981', fontWeight: 800 }}>{cfg.symbol}{win.toFixed(cfg.decimals)}</div></div>
             <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>Fee</div><div style={{ color: '#6B7280', fontWeight: 800 }}>{cfg.symbol}{fee.toFixed(cfg.decimals)}</div></div>
           </div>
+          </div>
+          {/* Quick matchmaking — preferred path */}
+          <button onPointerDown={findMatch} disabled={loading} style={S.btn('linear-gradient(135deg,#10B981,#059669)', loading)}>
+            🔍 Find Match (Auto)
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', maxWidth: 440 }}>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.06)' }} />
+            <span style={{ color: '#374151', fontSize: '.72rem', fontWeight: 600 }}>OR CREATE MANUALLY</span>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.06)' }} />
           </div>
           <button onPointerDown={createMatch} disabled={loading} style={S.btn('linear-gradient(135deg,#6366F1,#8B5CF6)', loading)}>
             {loading ? 'Creating...' : '⚔️ Create New Match'}
@@ -1154,6 +1450,50 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
       </div>
     )
   }
+
+// ─── QUEUE SCREEN ─────────────────────────────────────────────────────────
+  if (screen === 'queue') return (
+    <div style={{ ...S.page, justifyContent: 'center', minHeight: '100vh' }}>
+      {/* Animated chess piece pulse */}
+      <div style={{ fontSize: 64, animation: 'pulse 1.5s ease-in-out infinite' }}>♟</div>
+      <style>{`@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(0.92)} }`}</style>
+
+      <h2 style={{ fontWeight: 900, color: '#818CF8', fontSize: '1.5rem', margin: 0 }}>Finding Opponent</h2>
+      <p style={{ color: '#6B7280', fontSize: '.85rem', margin: 0 }}>
+        {cfg.icon} {cfg.symbol}{stake} {cfg.unit} stake
+      </p>
+
+      {/* Timer */}
+      <div style={{ background: '#111827', border: '1px solid rgba(99,102,241,.3)', borderRadius: 12, padding: '18px 36px', textAlign: 'center' }}>
+        <div style={{ color: '#A5B4FC', fontSize: '2.2rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>
+          {String(Math.floor(queueSeconds / 60)).padStart(2,'0')}:{String(queueSeconds % 60).padStart(2,'0')}
+        </div>
+        <div style={{ color: '#4B5563', fontSize: '.75rem', marginTop: 4 }}>searching...</div>
+      </div>
+
+      <div style={{ color: '#6B7280', fontSize: '.82rem', textAlign: 'center', maxWidth: 280, lineHeight: 1.6 }}>
+        {status || '🔍 Matching you with a player at the same stake...'}
+      </div>
+
+      {/* Prize preview */}
+      <div style={{ display: 'flex', gap: 20, background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 10, padding: '12px 24px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ color: '#6B7280', fontSize: '.7rem' }}>Pool</div>
+          <div style={{ color: '#A5B4FC', fontWeight: 800 }}>{cfg.symbol}{pool.toFixed(cfg.decimals)}</div>
+        </div>
+        <div style={{ width: 1, background: 'rgba(255,255,255,.06)' }} />
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ color: '#6B7280', fontSize: '.7rem' }}>You Win</div>
+          <div style={{ color: '#10B981', fontWeight: 800 }}>{cfg.symbol}{win.toFixed(cfg.decimals)}</div>
+        </div>
+      </div>
+
+      <button onPointerDown={() => { cancelQueue(); setScreen('home') }}
+        style={{ background: 'transparent', border: '1px solid #374151', color: '#6B7280', padding: '11px 32px', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: '.9rem', WebkitTapHighlightColor: 'transparent' }}>
+        ✕ Cancel Search
+      </button>
+    </div>
+  )
 
   // ─── LOBBY ────────────────────────────────────────────────────────────────
   if (screen === 'lobby') return (

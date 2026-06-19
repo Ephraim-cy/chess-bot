@@ -22,7 +22,8 @@ CHANGES IN THIS VERSION (fixing the "piece snaps back" bug):
   so a malformed string never reaches the broad except/forfeit branch.
 """
 
-import os, uuid, json, hashlib, hmac, time, re
+import os, uuid, json, hashlib, hmac, time, re, asyncio
+from collections import defaultdict
 from urllib.parse import unquote
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -156,8 +157,11 @@ async def owner_credit_user(
 #  MATCH CREATION WITH STAKE
 # ─────────────────────────────────────────────────────────────────────────────
 
+ALLOWED_CURRENCIES = {"USDT", "TON", "STARS"}
+
 class CreateMatchRequest(BaseModel):
-    stake: float       # USDT amount each player bets
+    stake: float
+    currency: str = "USDT"
 
 @app.post("/api/match/create")
 async def create_match(body: CreateMatchRequest, x_init_data: str = Header(default="test")):
@@ -181,15 +185,21 @@ async def create_match(body: CreateMatchRequest, x_init_data: str = Header(defau
     if user.playable_balance < Decimal(str(stake)):
         raise HTTPException(400, f"Insufficient balance. You have ${float(user.playable_balance):.2f} USDT, need ${stake:.2f}")
 
+   # Validate currency server-side — never trust client
+    currency = body.currency.upper().strip()
+    if currency not in ALLOWED_CURRENCIES:
+        raise HTTPException(400, f"Invalid currency. Allowed: {', '.join(ALLOWED_CURRENCIES)}")
+
     match_id = str(uuid.uuid4())
     active_games[match_id] = {
-        "board":    chess.Board(),
-        "white_tg": tg_id,
-        "black_tg": None,
-        "stake":    stake,
-        "ws":       {"white": None, "black": None},
-        "moves":    [],
-        "status":   "waiting",
+        "board":      chess.Board(),
+        "white_tg":   tg_id,
+        "black_tg":   None,
+        "stake":      stake,
+        "currency":   currency,
+        "ws":         {"white": None, "black": None},
+        "moves":      [],
+        "status":     "waiting",
         "created_at": time.time(),
         "bad_move_count": {"white": 0, "black": 0},
     }
@@ -198,6 +208,7 @@ async def create_match(body: CreateMatchRequest, x_init_data: str = Header(defau
         "match_id": match_id,
         "color":    "white",
         "stake":    stake,
+        "currency": currency,
         "message":  f"Share match ID with opponent: {match_id}",
     }
 
@@ -238,7 +249,7 @@ async def join_match(match_id: str, x_init_data: str = Header(default="test")):
 
     # 6. Lock escrow for BOTH players atomically
     try:
-        lock_escrow(match_id, game["white_tg"], tg_id, stake)
+        lock_escrow(match_id, game["white_tg"], tg_id, stake, game.get("currency", "USDT"))
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -249,6 +260,7 @@ async def join_match(match_id: str, x_init_data: str = Header(default="test")):
         "match_id": match_id,
         "color":    "black",
         "stake":    stake,
+        "currency": game.get("currency", "USDT"),
         "pool":     stake * 2,
         "message":  "Escrow locked. Game started!",
     }
@@ -455,3 +467,145 @@ async def ws_game(ws: WebSocket, match_id: str, color: str):
                 except Exception:
                     pass
             active_games.pop(match_id, None)
+# ─────────────────────────────────────────────────────────────────────────────
+#  AUTO MATCHMAKING QUEUE
+#  WebSocket endpoint — client connects with stake + currency.
+#  Server pairs two players at matching stake/currency, creates the match,
+#  locks escrow, and tells both players their match_id + color.
+#  If no opponent found within 30 seconds: timeout message, client retries.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Queue lives in memory — keyed by "CURRENCY:STAKE" e.g. "USDT:5.0"
+# Each entry: {"ws": WebSocket, "telegram_id": int, "stake": float, "currency": str}
+_queue: dict = defaultdict(list)
+_queue_lock = asyncio.Lock()
+
+@app.websocket("/ws/queue/{stake}/{currency}")
+async def ws_queue(ws: WebSocket, stake: float, currency: str, init: str = "test"):
+    await ws.accept()
+
+    # 1. Validate currency — allowlist, server-side always
+    currency = currency.upper().strip()
+    if currency not in ALLOWED_CURRENCIES:
+        await ws.close(code=1008, reason="Invalid currency")
+        return
+
+    # 2. Validate stake range
+    try:
+        stake = float(stake)
+        if stake <= 0 or stake > 1000:
+            await ws.close(code=1008, reason="Invalid stake")
+            return
+    except Exception:
+        await ws.close(code=1008, reason="Invalid stake")
+        return
+
+    # 3. Verify Telegram identity — same as every other endpoint
+    try:
+        user_data = verify_telegram(init)
+        tg_id = int(user_data["id"])
+        username = user_data.get("username", f"user_{tg_id}")
+    except Exception:
+        await ws.close(code=1008, reason="Auth failed")
+        return
+
+    # 4. Ensure user exists in DB
+    user = get_or_create_user(tg_id, username)
+    require_active_account(user.status, tg_id)
+
+    # 5. Check balance before entering queue — fail fast
+    from decimal import Decimal
+    if user.playable_balance < Decimal(str(stake)):
+        await ws.send_json({"type": "error", "msg": f"Insufficient balance. Need {stake} {currency}."})
+        await ws.close(code=1008, reason="Insufficient balance")
+        return
+
+    queue_key = f"{currency}:{stake}"
+    entry = {"ws": ws, "telegram_id": tg_id, "stake": stake, "currency": currency}
+    matched = False
+
+    async with _queue_lock:
+        queue = _queue[queue_key]
+
+        # Look for a waiting opponent (anyone except ourselves)
+        opponent = None
+        for i, e in enumerate(queue):
+            if e["telegram_id"] != tg_id:
+                opponent = queue.pop(i)
+                break
+
+        if opponent:
+            matched = True
+            # Create the match — opponent (waited longer) gets white
+            match_id = str(uuid.uuid4())
+            active_games[match_id] = {
+                "board":      chess.Board(),
+                "white_tg":   opponent["telegram_id"],
+                "black_tg":   tg_id,
+                "stake":      stake,
+                "currency":   currency,
+                "ws":         {"white": None, "black": None},
+                "moves":      [],
+                "status":     "active",
+                "created_at": time.time(),
+                "bad_move_count": {"white": 0, "black": 0},
+            }
+
+            # Lock escrow atomically for both players
+            try:
+                lock_escrow(match_id, opponent["telegram_id"], tg_id, stake, currency)
+            except Exception as ex:
+                active_games.pop(match_id, None)
+                err = {"type": "error", "msg": f"Escrow failed: {str(ex)}"}
+                await ws.send_json(err)
+                try:
+                    await opponent["ws"].send_json(err)
+                except Exception:
+                    pass
+                return
+
+            # Notify both — opponent is white, new arrival is black
+            try:
+                await opponent["ws"].send_json({
+                    "type":     "matched",
+                    "match_id": match_id,
+                    "color":    "white",
+                    "stake":    stake,
+                    "currency": currency,
+                })
+            except Exception:
+                pass
+
+            await ws.send_json({
+                "type":     "matched",
+                "match_id": match_id,
+                "color":    "black",
+                "stake":    stake,
+                "currency": currency,
+            })
+
+        else:
+            # No opponent yet — join the queue and tell client
+            queue.append(entry)
+            await ws.send_json({"type": "waiting", "in_queue": len(queue)})
+
+    if matched:
+        return
+
+    # 6. Wait up to 30 seconds for match notification
+    # Client must stay connected — any incoming message cancels the queue
+    try:
+        await asyncio.wait_for(ws.receive_text(), timeout=30.0)
+        # Client sent something (e.g. "cancel") — remove from queue
+        async with _queue_lock:
+            _queue[queue_key] = [e for e in _queue[queue_key] if e["telegram_id"] != tg_id]
+        await ws.send_json({"type": "cancelled"})
+    except asyncio.TimeoutError:
+        # 30 seconds up — remove from queue, tell client
+        async with _queue_lock:
+            _queue[queue_key] = [e for e in _queue[queue_key] if e["telegram_id"] != tg_id]
+        await ws.send_json({"type": "timeout"})
+    except Exception:
+        # Disconnected while waiting — clean up silently
+        async with _queue_lock:
+            _queue[queue_key] = [e for e in _queue[queue_key] if e["telegram_id"] != tg_id]
