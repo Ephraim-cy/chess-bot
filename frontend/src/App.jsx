@@ -339,6 +339,248 @@ function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap,
   )
 }
 
+// ─── PROFILE SCREEN ───────────────────────────────────────────────────────────
+function ProfileScreen({ onBack }) {
+  const [profile, setProfile]   = useState(null)
+  const [txns, setTxns]         = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [tab, setTab]           = useState('overview')   // 'overview' | 'history'
+  const [error, setError]       = useState('')
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      try {
+        const [meRes, txRes] = await Promise.all([
+          fetch(API + '/api/me',           { headers: { 'x-init-data': 'test' } }),
+          fetch(API + '/api/transactions', { headers: { 'x-init-data': 'test' } })
+        ])
+        if (meRes.ok)  setProfile(await meRes.json())
+        if (txRes.ok)  setTxns((await txRes.json()).transactions || [])
+      } catch { setError('Could not load profile. Check connection.') }
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  const avatarLetter = (tgUser.username || tgUser.first_name || 'P')[0].toUpperCase()
+  const playable  = parseFloat(profile?.playable_balance  || 0)
+  const locked    = parseFloat(profile?.locked_balance    || 0)
+  const total     = playable + locked
+
+  // Derive win/loss/draw counts from transaction history
+  const wins   = txns.filter(t => t.type === 'winnings').length
+  const losses = txns.filter(t => t.type === 'rake' || t.type === 'loss').length
+  const totalGames = wins + losses
+
+  // Type → display config
+  function txMeta(type) {
+    if (type === 'deposit')  return { label: 'Deposit',   color: '#10B981', sign: '+', icon: '⬇️' }
+    if (type === 'withdraw') return { label: 'Withdraw',  color: '#EF4444', sign: '-', icon: '⬆️' }
+    if (type === 'winnings') return { label: 'Winnings',  color: '#10B981', sign: '+', icon: '🏆' }
+    if (type === 'stake')    return { label: 'Stake',     color: '#F59E0B', sign: '-', icon: '🎯' }
+    if (type === 'refund')   return { label: 'Refund',    color: '#6366F1', sign: '+', icon: '↩️' }
+    if (type === 'rake')     return { label: 'Fee',       color: '#6B7280', sign: '-', icon: '💸' }
+    return                          { label: type,        color: '#9CA3AF', sign: '',  icon: '•'  }
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '—'
+    const d = new Date(iso)
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })
+      + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  const tabStyle = (active) => ({
+    flex: 1, padding: '9px 4px', borderRadius: 8, border: 'none',
+    background: active ? 'rgba(99,102,241,.2)' : 'transparent',
+    color: active ? '#A5B4FC' : '#4B5563',
+    fontWeight: 700, fontSize: '.82rem', cursor: 'pointer',
+    borderBottom: active ? '2px solid #6366F1' : '2px solid transparent',
+    WebkitTapHighlightColor: 'transparent', transition: 'all .15s'
+  })
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#080B14', color: '#eaeaea', fontFamily: 'sans-serif', paddingBottom: 32 }}>
+
+      {/* ── Top header bar ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+        <button onPointerDown={onBack} style={{ background: 'transparent', border: 'none', color: '#6B7280', fontSize: '1.1rem', cursor: 'pointer', padding: '4px 8px', WebkitTapHighlightColor: 'transparent' }}>←</button>
+        <div style={{ fontWeight: 800, color: '#818CF8', fontSize: '1rem' }}>My Account</div>
+      </div>
+
+      {loading && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '60px 20px', color: '#4B5563' }}>
+          <div style={{ fontSize: 32, animation: 'spin 1s linear infinite' }}>⟳</div>
+          <div style={{ fontSize: '.85rem' }}>Loading your profile...</div>
+        </div>
+      )}
+
+      {error && (
+        <div style={{ margin: '20px 16px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, padding: '12px 16px', color: '#FCA5A5', fontSize: '.85rem', textAlign: 'center' }}>
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && (
+        <>
+          {/* ── Avatar + identity card ── */}
+          <div style={{ margin: '20px 16px 0', background: 'linear-gradient(135deg,#111827,#1a2236)', border: '1px solid rgba(99,102,241,.2)', borderRadius: 16, padding: '20px 20px 16px', position: 'relative', overflow: 'hidden' }}>
+            {/* Glow blob */}
+            <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, background: 'rgba(99,102,241,.12)', borderRadius: '50%', filter: 'blur(30px)', pointerEvents: 'none' }} />
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              {/* Avatar circle */}
+              <div style={{ width: 58, height: 58, borderRadius: '50%', background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 900, color: '#fff', flexShrink: 0, boxShadow: '0 0 0 3px rgba(99,102,241,.3)' }}>
+                {avatarLetter}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#eaeaea', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  @{tgUser.username || tgUser.first_name || 'Player'}
+                </div>
+                <div style={{ color: '#4B5563', fontSize: '.75rem', marginTop: 2 }}>
+                  Telegram ID: <span style={{ color: '#6366F1', fontFamily: 'monospace' }}>{tgUser.id || '—'}</span>
+                </div>
+                <div style={{ display: 'inline-block', marginTop: 6, background: profile?.status === 'active' ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)', border: `1px solid ${profile?.status === 'active' ? 'rgba(16,185,129,.4)' : 'rgba(239,68,68,.4)'}`, borderRadius: 20, padding: '2px 10px', fontSize: '.68rem', fontWeight: 700, color: profile?.status === 'active' ? '#10B981' : '#EF4444', letterSpacing: '.5px' }}>
+                  {(profile?.status || 'active').toUpperCase()}
+                </div>
+              </div>
+            </div>
+
+            {/* Total balance hero */}
+            <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.05)' }}>
+              <div style={{ color: '#4B5563', fontSize: '.7rem', fontWeight: 700, letterSpacing: '1px', marginBottom: 4 }}>TOTAL BALANCE</div>
+              <div style={{ fontSize: '2rem', fontWeight: 900, color: '#A5B4FC', letterSpacing: '-1px' }}>
+                ${total.toFixed(2)} <span style={{ fontSize: '.9rem', color: '#6366F1', fontWeight: 700 }}>USDT</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Balance breakdown cards ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '10px 16px 0' }}>
+            <div style={{ background: '#111827', border: '1px solid rgba(16,185,129,.2)', borderRadius: 12, padding: '14px' }}>
+              <div style={{ color: '#4B5563', fontSize: '.68rem', fontWeight: 700, letterSpacing: '.8px', marginBottom: 6 }}>AVAILABLE</div>
+              <div style={{ color: '#10B981', fontSize: '1.2rem', fontWeight: 800 }}>${playable.toFixed(2)}</div>
+              <div style={{ color: '#374151', fontSize: '.68rem', marginTop: 3 }}>Ready to play</div>
+            </div>
+            <div style={{ background: '#111827', border: '1px solid rgba(245,158,11,.2)', borderRadius: 12, padding: '14px' }}>
+              <div style={{ color: '#4B5563', fontSize: '.68rem', fontWeight: 700, letterSpacing: '.8px', marginBottom: 6 }}>IN ESCROW</div>
+              <div style={{ color: '#F59E0B', fontSize: '1.2rem', fontWeight: 800 }}>${locked.toFixed(2)}</div>
+              <div style={{ color: '#374151', fontSize: '.68rem', marginTop: 3 }}>Active match</div>
+            </div>
+          </div>
+
+          {/* ── Stats row ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, margin: '10px 16px 0' }}>
+            {[
+              { label: 'GAMES',  value: totalGames, color: '#A5B4FC' },
+              { label: 'WINS',   value: wins,        color: '#10B981' },
+              { label: 'LOSSES', value: losses,      color: '#EF4444' },
+            ].map(s => (
+              <div key={s.label} style={{ background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 12, padding: '12px 10px', textAlign: 'center' }}>
+                <div style={{ color: s.color, fontSize: '1.3rem', fontWeight: 900 }}>{s.value}</div>
+                <div style={{ color: '#4B5563', fontSize: '.62rem', fontWeight: 700, letterSpacing: '.8px', marginTop: 3 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Deposit / Withdraw action buttons ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '14px 16px 0' }}>
+            <button onPointerDown={() => alert('Deposit flow coming soon.\nSend USDT to your wallet address and contact support.')}
+              style={{ background: 'linear-gradient(135deg,#10B981,#059669)', border: 'none', borderRadius: 12, padding: '13px', color: '#fff', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+              ⬇️ Deposit
+            </button>
+            <button onPointerDown={() => alert('Withdraw flow coming soon.\nMinimum withdrawal: $5 USDT.')}
+              style={{ background: playable >= 5 ? 'linear-gradient(135deg,#6366F1,#8B5CF6)' : '#1f2937', border: 'none', borderRadius: 12, padding: '13px', color: playable >= 5 ? '#fff' : '#4B5563', fontWeight: 800, fontSize: '.9rem', cursor: playable >= 5 ? 'pointer' : 'not-allowed', WebkitTapHighlightColor: 'transparent' }}>
+              ⬆️ Withdraw
+            </button>
+          </div>
+          <div style={{ margin: '6px 16px 0', color: '#374151', fontSize: '.7rem', textAlign: 'center' }}>
+            Minimum withdrawal: $5.00 USDT · 10% platform fee on winnings
+          </div>
+
+          {/* ── Tab switcher ── */}
+          <div style={{ display: 'flex', gap: 4, margin: '18px 16px 0', background: '#0d1117', borderRadius: 10, padding: 4 }}>
+            <button onPointerDown={() => setTab('overview')} style={tabStyle(tab === 'overview')}>📊 Overview</button>
+            <button onPointerDown={() => setTab('history')}  style={tabStyle(tab === 'history')}>📋 History ({txns.length})</button>
+          </div>
+
+          {/* ── Overview tab ── */}
+          {tab === 'overview' && (
+            <div style={{ margin: '12px 16px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Win rate bar */}
+              <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 12, padding: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#6B7280', fontSize: '.75rem', fontWeight: 700 }}>WIN RATE</span>
+                  <span style={{ color: '#A5B4FC', fontSize: '.75rem', fontWeight: 800 }}>
+                    {totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0}%
+                  </span>
+                </div>
+                <div style={{ height: 8, background: '#1f2937', borderRadius: 99, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${totalGames > 0 ? (wins / totalGames) * 100 : 0}%`, background: 'linear-gradient(90deg,#10B981,#34D399)', borderRadius: 99, transition: 'width .6s ease' }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                  <span style={{ color: '#10B981', fontSize: '.68rem' }}>{wins} wins</span>
+                  <span style={{ color: '#EF4444', fontSize: '.68rem' }}>{losses} losses</span>
+                </div>
+              </div>
+
+              {/* Account info rows */}
+              {[
+                { label: 'Account ID',   value: profile?.id ? profile.id.slice(0,8) + '...' : '—', mono: true },
+                { label: 'Telegram ID',  value: tgUser.id || '—', mono: true },
+                { label: 'Username',     value: '@' + (tgUser.username || tgUser.first_name || 'Player'), mono: false },
+                { label: 'Status',       value: (profile?.status || 'active').toUpperCase(), mono: false },
+              ].map(row => (
+                <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 10, padding: '12px 14px' }}>
+                  <span style={{ color: '#6B7280', fontSize: '.8rem' }}>{row.label}</span>
+                  <span style={{ color: '#A5B4FC', fontSize: '.8rem', fontWeight: 700, fontFamily: row.mono ? 'monospace' : 'inherit' }}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── History tab ── */}
+          {tab === 'history' && (
+            <div style={{ margin: '12px 16px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {txns.length === 0 && (
+                <div style={{ textAlign: 'center', color: '#4B5563', padding: '40px 0', fontSize: '.85rem' }}>
+                  No transactions yet.<br />Play a match to see your history here.
+                </div>
+              )}
+              {txns.map((t, i) => {
+                const m = txMeta(t.type)
+                return (
+                  <div key={t.id || i} style={{ background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {/* Icon */}
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: `${m.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
+                      {m.icon}
+                    </div>
+                    {/* Label + date */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: '.82rem', color: '#eaeaea' }}>{m.label}</div>
+                      <div style={{ color: '#4B5563', fontSize: '.68rem', marginTop: 1 }}>{formatDate(t.created_at)}</div>
+                    </div>
+                    {/* Amount */}
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontWeight: 800, fontSize: '.9rem', color: m.color }}>
+                        {m.sign}${parseFloat(t.amount || 0).toFixed(2)}
+                      </div>
+                      <div style={{ fontSize: '.65rem', color: t.status === 'completed' ? '#10B981' : '#F59E0B', marginTop: 1, fontWeight: 700 }}>
+                        {(t.status || 'pending').toUpperCase()}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 const S = {
   page: {
@@ -647,12 +889,17 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
   // ─── HOME ─────────────────────────────────────────────────────────────────
   if (screen === 'home') return (
     <div style={S.page}>
-      <div style={{ fontSize: 52 }}>♟</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', maxWidth: 440 }}>
+        <div style={{ fontSize: 52, lineHeight: 1 }}>♟</div>
+        <button onPointerDown={() => setScreen('profile')} style={{ background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 10, padding: '8px 14px', color: '#A5B4FC', fontWeight: 700, fontSize: '.78rem', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', marginTop: 6 }}>
+          👤 My Account
+        </button>
+      </div>
       <h1 style={{ fontSize: '1.9rem', fontWeight: 900, color: '#818CF8', letterSpacing: '-1px', margin: 0 }}>
         CHESS ARENA
       </h1>
       <p style={{ color: '#6B7280', fontSize: '.8rem', margin: 0 }}>@{tgUser.username || 'Player'}</p>
-
+      
       <div style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 440 }}>
         <button onPointerDown={() => setMode('computer')} style={S.modeBtn(mode === 'computer')}>🤖 vs Computer</button>
         <button onPointerDown={() => setMode('human')}    style={S.modeBtn(mode === 'human')}>⚔️ vs Human</button>
@@ -723,6 +970,9 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
       )}
     </div>
   )
+
+  // ─── PROFILE ──────────────────────────────────────────────────────────────
+  if (screen === 'profile') return <ProfileScreen onBack={() => setScreen('home')} />
 
   // ─── LOBBY ────────────────────────────────────────────────────────────────
   if (screen === 'lobby') return (
