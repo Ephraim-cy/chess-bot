@@ -4,6 +4,38 @@ import { Chess } from 'chess.js'
 const API = 'https://chess-bot-production-efa2.up.railway.app'
 const WSS = 'wss://chess-bot-production-efa2.up.railway.app'
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+// ─── CURRENCY CONFIG ──────────────────────────────────────────────────────────
+// Stakes, symbols, and decimals per currency.
+// All financial validation happens SERVER-SIDE — this is display config only.
+const CURRENCY_CONFIG = {
+  USDT: {
+    symbol: '$',
+    unit: 'USDT',
+    icon: '💵',
+    stakes: [1, 5, 10, 25, 50],
+    decimals: 2,
+    color: '#26A17B',        // Tether green
+    description: 'Tether USD — stable, pegged 1:1 to US Dollar'
+  },
+  TON: {
+    symbol: '◎',
+    unit: 'TON',
+    icon: '💎',
+    stakes: [0.5, 1, 2, 5, 10],
+    decimals: 2,
+    color: '#0088CC',        // TON blue
+    description: 'The Open Network — Telegram\'s native blockchain'
+  },
+  STARS: {
+    symbol: '★',
+    unit: 'Stars',
+    icon: '⭐',
+    stakes: [50, 100, 250, 500, 1000],
+    decimals: 0,
+    color: '#F59E0B',        // Gold
+    description: 'Telegram Stars — buy directly inside Telegram'
+  }
+}
 
 const tg = window.Telegram?.WebApp
 const tgUser = tg?.initDataUnsafe?.user || { id: 0, username: 'Player' }
@@ -219,7 +251,7 @@ function playSoundForMove(move, chess) {
   sfx().move()
 }
 // ─── CUSTOM CHESS BOARD ───────────────────────────────────────────────────────
-function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap, showHints, lastMove }) {
+function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap, showHints, lastMove, checkedKingSq }) {
   const files = ['a','b','c','d','e','f','g','h']
   const ranks = ['8','7','6','5','4','3','2','1']
 
@@ -255,8 +287,10 @@ function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap,
           const hasPiece = !!piece
 
           // Square background
+          const isCheckedKing = sq === checkedKingSq
           let bg = isLight ? '#FCD34D' : '#B45309'
-          if (isSelected) bg = '#6366F1'
+          if (isSelected)           bg = '#6366F1'
+          else if (isCheckedKing)   bg = '#EF4444'                          // red — king in check
           else if (isLastFrom || isLastTo) bg = isLight ? '#a3e635' : '#65a30d'
 
           return (
@@ -630,8 +664,10 @@ const S = {
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen]   = useState('home')
+  const helpFromRef           = useRef('home')
   const [mode, setMode]       = useState('human')
-  const [stake, setStake]     = useState(5)
+  const [currency, setCurrency] = useState('USDT')
+  const [stake, setStake]       = useState(5)
   const [status, setStatus]   = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -801,7 +837,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
       const res = await fetch(API + '/api/match/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-init-data': 'test' },
-        body: JSON.stringify({ stake })
+        body: JSON.stringify({ stake, currency })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(JSON.stringify(data))
@@ -843,6 +879,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
       }
       if (msg.type === 'state') {
         applyServerFen(msg.fen)
+        if (msg.last_move) setLastMove({ from: msg.last_move.slice(0,2), to: msg.last_move.slice(2,4) })
         setSelectedSq(null); setLegalTargets([])
         const mine = msg.turn === myClr
         setMyTurnUI(mine && !msg.game_over)
@@ -868,7 +905,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
     setMyTurnUI(false); setResult(r)
     setSelectedSq(null); setLegalTargets([])
     if (!r.winner) setStatus('½ Draw!')
-    else if (r.winner === clr) setStatus('🏆 YOU WIN! +$' + (stake * 2 * 0.9).toFixed(2) + ' USDT')
+    else if (r.winner === clr) setStatus(`🏆 YOU WIN! +${cfg.symbol}${(stake * 2 * 0.9).toFixed(cfg.decimals)} ${cfg.unit}`)
     else setStatus('💀 You lost.')
   }
 
@@ -883,8 +920,27 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
     bump()
   }
 
+  const cfg  = CURRENCY_CONFIG[currency]
   const pool = stake * 2, win = pool * 0.9, fee = pool * 0.1
   const isBot = mode === 'computer'
+
+  // ─── CHECK HIGHLIGHTING ───────────────────────────────────────────────────
+  // Find the king square of whoever is in check, so ChessBoard can flash it red.
+  // Derived from chessRef — safe read-only, no mutations.
+  function getCheckedKingSq() {
+    const chess = chessRef.current
+    if (!chess.isCheck()) return null
+    const turn = chess.turn()   // the side currently in check
+    for (const rank of ['1','2','3','4','5','6','7','8']) {
+      for (const file of ['a','b','c','d','e','f','g','h']) {
+        const sq = file + rank
+        const p = chess.get(sq)
+        if (p && p.type === 'k' && p.color === turn) return sq
+      }
+    }
+    return null
+  }
+  const checkedKingSq = (screen === 'game') ? getCheckedKingSq() : null
 
   // ─── HOME ─────────────────────────────────────────────────────────────────
   if (screen === 'home') return (
@@ -898,8 +954,14 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
       <h1 style={{ fontSize: '1.9rem', fontWeight: 900, color: '#818CF8', letterSpacing: '-1px', margin: 0 }}>
         CHESS ARENA
       </h1>
-      <p style={{ color: '#6B7280', fontSize: '.8rem', margin: 0 }}>@{tgUser.username || 'Player'}</p>
-      
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <p style={{ color: '#6B7280', fontSize: '.8rem', margin: 0 }}>@{tgUser.username || 'Player'}</p>
+        <button onPointerDown={() => { helpFromRef.current = 'home'; setScreen('help') }}
+          style={{ background: 'rgba(99,102,241,.15)', border: '1px solid rgba(99,102,241,.3)', color: '#818CF8', borderRadius: '50%', width: 28, height: 28, fontWeight: 800, fontSize: '.85rem', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}>
+          ?
+        </button>
+      </div>
+
       <div style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 440 }}>
         <button onPointerDown={() => setMode('computer')} style={S.modeBtn(mode === 'computer')}>🤖 vs Computer</button>
         <button onPointerDown={() => setMode('human')}    style={S.modeBtn(mode === 'human')}>⚔️ vs Human</button>
@@ -932,17 +994,41 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
       {mode === 'human' && (
         <>
           <div style={S.box}>
-            <p style={{ color: '#6B7280', fontSize: '.72rem', fontWeight: 700, letterSpacing: '1px', marginBottom: '10px' }}>SET STAKE (USDT)</p>
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-              {[1,5,10,25,50].map(v => (
-                <button key={v} onPointerDown={() => setStake(v)} style={S.sBtn(stake === v)}>${v}</button>
-              ))}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', textAlign: 'center', background: '#1a2236', borderRadius: '8px', padding: '12px' }}>
-              <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>Pool</div><div style={{ color: '#A5B4FC', fontWeight: 800 }}>${pool.toFixed(2)}</div></div>
-              <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>You Win</div><div style={{ color: '#10B981', fontWeight: 800 }}>${win.toFixed(2)}</div></div>
-              <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>Fee</div><div style={{ color: '#6B7280', fontWeight: 800 }}>${fee.toFixed(2)}</div></div>
-            </div>
+            {/* Currency selector */}
+          <p style={{ color: '#6B7280', fontSize: '.72rem', fontWeight: 700, letterSpacing: '1px', marginBottom: 8 }}>CURRENCY</p>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+            {Object.entries(CURRENCY_CONFIG).map(([key, c]) => (
+              <button key={key} onPointerDown={() => { setCurrency(key); setStake(c.stakes[1]) }}
+                style={{
+                  flex: 1, padding: '8px 4px', borderRadius: 8,
+                  border: currency === key ? `2px solid ${c.color}` : '1px solid #1f2937',
+                  background: currency === key ? `${c.color}22` : 'transparent',
+                  color: currency === key ? c.color : '#6B7280',
+                  fontWeight: 700, fontSize: '.8rem', cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent'
+                }}>
+                {c.icon} {key}
+              </button>
+            ))}
+          </div>
+          <p style={{ color: '#4B5563', fontSize: '.68rem', margin: '-8px 0 12px' }}>{cfg.description}</p>
+
+          {/* Stake selector — amounts change per currency */}
+          <p style={{ color: '#6B7280', fontSize: '.72rem', fontWeight: 700, letterSpacing: '1px', marginBottom: '10px' }}>
+            SET STAKE ({cfg.unit})
+          </p>
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+            {cfg.stakes.map(v => (
+              <button key={v} onPointerDown={() => setStake(v)} style={S.sBtn(stake === v)}>
+                {cfg.symbol}{v}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', textAlign: 'center', background: '#1a2236', borderRadius: '8px', padding: '12px' }}>
+            <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>Pool</div><div style={{ color: '#A5B4FC', fontWeight: 800 }}>{cfg.symbol}{pool.toFixed(cfg.decimals)}</div></div>
+            <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>You Win</div><div style={{ color: '#10B981', fontWeight: 800 }}>{cfg.symbol}{win.toFixed(cfg.decimals)}</div></div>
+            <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>Fee</div><div style={{ color: '#6B7280', fontWeight: 800 }}>{cfg.symbol}{fee.toFixed(cfg.decimals)}</div></div>
+          </div>
           </div>
           <button onPointerDown={createMatch} disabled={loading} style={S.btn('linear-gradient(135deg,#6366F1,#8B5CF6)', loading)}>
             {loading ? 'Creating...' : '⚔️ Create New Match'}
@@ -973,6 +1059,101 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
 
   // ─── PROFILE ──────────────────────────────────────────────────────────────
   if (screen === 'profile') return <ProfileScreen onBack={() => setScreen('home')} />
+
+// ─── HELP ─────────────────────────────────────────────────────────────────
+  if (screen === 'help') {
+    const Section = ({ title, children }) => (
+      <div style={{ ...S.box, marginBottom: 0 }}>
+        <p style={{ color: '#818CF8', fontSize: '.78rem', fontWeight: 800, letterSpacing: '1px', marginBottom: 10 }}>{title}</p>
+        {children}
+      </div>
+    )
+    const Row = ({ label, value, color = '#A5B4FC' }) => (
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+        <span style={{ color: '#6B7280', fontSize: '.82rem' }}>{label}</span>
+        <span style={{ color, fontSize: '.82rem', fontWeight: 700 }}>{value}</span>
+      </div>
+    )
+    const P = ({ children }) => (
+      <p style={{ color: '#9CA3AF', fontSize: '.82rem', lineHeight: 1.6, margin: '0 0 8px' }}>{children}</p>
+    )
+
+    return (
+      <div style={{ ...S.page, gap: 10 }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 440 }}>
+          <button onPointerDown={() => setScreen(helpFromRef.current)}
+            style={{ background: 'transparent', border: '1px solid #1f2937', color: '#6B7280', padding: '7px 14px', borderRadius: 8, cursor: 'pointer', fontSize: '.82rem', WebkitTapHighlightColor: 'transparent' }}>
+            ← Back
+          </button>
+          <span style={{ fontWeight: 800, color: '#818CF8', fontSize: '.95rem' }}>📖 Help & Rules</span>
+          <div style={{ width: 60 }} />
+        </div>
+
+        {/* How to Play */}
+        <Section title="♟ HOW TO PLAY">
+          <P>Tap any of your pieces to select it. Legal moves appear as dots on the board. Tap a dot to move there. Tap a different piece to switch selection.</P>
+          <P>Capture squares show a ring around the enemy piece. The goal is to checkmate the opponent's king — trap it so it cannot escape.</P>
+        </Section>
+
+        {/* Move Highlighting */}
+        <Section title="🎨 BOARD COLOURS">
+          <Row label="🟨 Yellow / Brown" value="Normal squares" />
+          <Row label="🟩 Green" value="Last move (from → to)" color="#a3e635" />
+          <Row label="🟪 Purple" value="Selected piece" color="#818CF8" />
+          <Row label="🔴 Red" value="King in check" color="#EF4444" />
+          <Row label="⚪ White dot" value="Legal move target" />
+          <Row label="🟢 Green dot" value="Legal move (Easy mode hint)" color="#10B981" />
+        </Section>
+
+        {/* Piece Values */}
+        <Section title="♟ PIECE VALUES">
+          <Row label="♙ Pawn"   value="1 point" />
+          <Row label="♘ Knight" value="3 points" />
+          <Row label="♗ Bishop" value="3 points" />
+          <Row label="♖ Rook"   value="5 points" />
+          <Row label="♕ Queen"  value="9 points" />
+          <Row label="♔ King"   value="∞ — protect at all costs" color="#EF4444" />
+        </Section>
+
+        {/* Currency & Payments */}
+        <Section title="💰 CURRENCIES">
+          {Object.entries(CURRENCY_CONFIG).map(([key, c]) => (
+            <Row key={key} label={`${c.icon} ${key}`} value={c.description.split('—')[0].trim()} color={c.color} />
+          ))}
+          <P style={{ marginTop: 8 }}>All balances are held in a secure escrow on the server. Stakes are locked the moment both players join. You are never charged unless a complete match is played.</P>
+        </Section>
+
+        {/* Prize Structure */}
+        <Section title="🏆 PRIZE STRUCTURE">
+          <P>When you win a match:</P>
+          <Row label="Your stake" value="Returned" color="#10B981" />
+          <Row label="Opponent's stake" value="90% to you" color="#10B981" />
+          <Row label="Platform fee" value="10% rake" color="#6B7280" />
+          <P>On a draw, both players receive their original stake back. No rake is charged on draws.</P>
+        </Section>
+
+        {/* Difficulty */}
+        <Section title="🤖 VS COMPUTER MODES">
+          <Row label="🟢 Easy"   value="Random legal moves — perfect for beginners" />
+          <Row label="🟡 Medium" value="2-ply minimax — plays solid, won't blunder big pieces" />
+          <Row label="🔴 Hard"   value="3-ply minimax + alpha-beta — tactical, punishes mistakes" />
+          <P>Computer moves are computed locally on your device — no internet needed, instant response.</P>
+        </Section>
+
+        {/* Security */}
+        <Section title="🔒 SECURITY">
+          <P>Your Telegram identity is verified with HMAC-SHA256 on every request. Stakes are validated server-side — the frontend never controls financial logic. All payouts are atomic — a match can only be settled once.</P>
+          <P>If you disconnect mid-game, your opponent wins automatically. If both players disconnect simultaneously, stakes are refunded.</P>
+        </Section>
+
+        <button onPointerDown={() => setScreen(helpFromRef.current)}
+          style={{ ...S.btn('linear-gradient(135deg,#6366F1,#8B5CF6)', false), maxWidth: 440 }}>
+          ← Back to Game
+        </button>
+      </div>
+    )
+  }
 
   // ─── LOBBY ────────────────────────────────────────────────────────────────
   if (screen === 'lobby') return (
@@ -1043,6 +1224,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
           onSquareTap={isBot ? handleSquareTap : handleMultiSquareTap}
           showHints={showHints}
           lastMove={lastMove}
+          checkedKingSq={checkedKingSq}
         />
       </div>
 
@@ -1075,12 +1257,12 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: 460, background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 12, padding: '10px 16px', boxSizing: 'border-box' }}>
           <div>
             <div style={{ color: '#6B7280', fontSize: '.7rem' }}>Prize Pool</div>
-            <div style={{ color: '#10B981', fontWeight: 800 }}>${pool.toFixed(2)} USDT</div>
+          <div style={{ color: '#10B981', fontWeight: 800 }}>{cfg.symbol}{pool.toFixed(cfg.decimals)} {cfg.unit}</div>
           </div>
           <div style={{ width: 1, background: 'rgba(255,255,255,.06)' }} />
           <div style={{ textAlign: 'right' }}>
             <div style={{ color: '#6B7280', fontSize: '.7rem' }}>Winner Gets</div>
-            <div style={{ color: '#A5B4FC', fontWeight: 800 }}>${win.toFixed(2)} USDT</div>
+            <div style={{ color: '#A5B4FC', fontWeight: 800 }}>{cfg.symbol}{win.toFixed(cfg.decimals)} {cfg.unit}</div>
           </div>
         </div>
       )}
