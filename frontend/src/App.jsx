@@ -196,16 +196,23 @@ function fetchAIMove(fen, difficulty) {
 }
 
 // ─── SOUND ENGINE (Web Audio API — no libraries needed) ──────────────────────
-const AudioCtx = window.AudioContext || window.webkitAudioContext
+//const AudioCtx = window.AudioContext || window.webkitAudioContext
 
 function createSoundEngine() {
   let ctx = null
 
   function getCtx() {
-    if (!ctx) ctx = new AudioCtx()
+  const AudioCtx = window.AudioContext || window.webkitAudioContext
+  if (!AudioCtx) return null          // no audio support — skip silently
+  if (!ctx) ctx = new AudioCtx()
+
+    if (ctx && ctx.state === 'suspended') ctx.resume()
+  return ctx
+ // function getCtx() {
+  //  if (!ctx) ctx = new AudioCtx()
     // Resume if suspended (browser autoplay policy)
-    if (ctx.state === 'suspended') ctx.resume()
-    return ctx
+    //if (ctx.state === 'suspended') ctx.resume()
+    //return ctx
   }
 
   function playTone({ type = 'sine', freq, freq2, duration, volume = 0.4, attack = 0.01, decay = 0.1, fadeStart, notes }) {
