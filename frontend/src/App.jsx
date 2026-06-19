@@ -201,22 +201,31 @@ function fetchAIMove(fen, difficulty) {
 function createSoundEngine() {
   let ctx = null
 
-  function getCtx() {
+function getCtx() {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext
+  if (!AudioCtx) return null
+  if (!ctx) ctx = new AudioCtx()
+  if (ctx && ctx.state === 'suspended') ctx.resume()
+  return ctx
+}
+ /* function getCtx() {
   const AudioCtx = window.AudioContext || window.webkitAudioContext
   if (!AudioCtx) return null          // no audio support — skip silently
   if (!ctx) ctx = new AudioCtx()
 
     if (ctx && ctx.state === 'suspended') ctx.resume()
   return ctx
- // function getCtx() {
+ */
+// function getCtx() {
   //  if (!ctx) ctx = new AudioCtx()
     // Resume if suspended (browser autoplay policy)
     //if (ctx.state === 'suspended') ctx.resume()
     //return ctx
-  }
+//  }
 
   function playTone({ type = 'sine', freq, freq2, duration, volume = 0.4, attack = 0.01, decay = 0.1, fadeStart, notes }) {
     const c = getCtx()
+     if (!c) return     
     const now = c.currentTime
 
     // If notes array given, play each note sequentially
