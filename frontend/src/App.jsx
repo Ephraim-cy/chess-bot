@@ -12,7 +12,7 @@ const CURRENCY_CONFIG = {
     symbol: '$',
     unit: 'USDT',
     icon: '💵',
-    stakes: [1, 5, 10, 25, 50],
+    stakes: [0, 1, 5, 10, 25, 50],
     decimals: 2,
     color: '#26A17B',        // Tether green
     description: 'Tether USD — stable, pegged 1:1 to US Dollar'
@@ -21,7 +21,7 @@ const CURRENCY_CONFIG = {
     symbol: '◎',
     unit: 'TON',
     icon: '💎',
-    stakes: [0.5, 1, 2, 5, 10],
+    stakes: [0, 0.5, 1, 2, 5, 10],
     decimals: 2,
     color: '#0088CC',        // TON blue
     description: 'The Open Network — Telegram\'s native blockchain'
@@ -30,7 +30,7 @@ const CURRENCY_CONFIG = {
     symbol: '★',
     unit: 'Stars',
     icon: '⭐',
-    stakes: [50, 100, 250, 500, 1000],
+    stakes: [0, 50, 100, 250, 500, 1000],
     decimals: 0,
     color: '#F59E0B',        // Gold
     description: 'Telegram Stars — buy directly inside Telegram'
@@ -1132,14 +1132,22 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
           <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
             {cfg.stakes.map(v => (
               <button key={v} onPointerDown={() => setStake(v)} style={S.sBtn(stake === v)}>
-                {cfg.symbol}{v}
+                {v === 0 ? '🆓 FREE' : `${cfg.symbol}${v}`}
               </button>
             ))}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', textAlign: 'center', background: '#1a2236', borderRadius: '8px', padding: '12px' }}>
-            <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>Pool</div><div style={{ color: '#A5B4FC', fontWeight: 800 }}>{cfg.symbol}{pool.toFixed(cfg.decimals)}</div></div>
-            <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>You Win</div><div style={{ color: '#10B981', fontWeight: 800 }}>{cfg.symbol}{win.toFixed(cfg.decimals)}</div></div>
-            <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>Fee</div><div style={{ color: '#6B7280', fontWeight: 800 }}>{cfg.symbol}{fee.toFixed(cfg.decimals)}</div></div>
+            {stake === 0 ? (
+              <div style={{ gridColumn: '1/-1', color: '#10B981', fontWeight: 800, fontSize: '.9rem', padding: '4px 0' }}>
+                🆓 Free game — no money, just fun
+              </div>
+            ) : (
+              <>
+                <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>Pool</div><div style={{ color: '#A5B4FC', fontWeight: 800 }}>{cfg.symbol}{pool.toFixed(cfg.decimals)}</div></div>
+                <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>You Win</div><div style={{ color: '#10B981', fontWeight: 800 }}>{cfg.symbol}{win.toFixed(cfg.decimals)}</div></div>
+                <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>Fee</div><div style={{ color: '#6B7280', fontWeight: 800 }}>{cfg.symbol}{fee.toFixed(cfg.decimals)}</div></div>
+              </>
+            )}
           </div>
           </div>
           {/* Quick matchmaking — preferred path */}

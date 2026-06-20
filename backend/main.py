@@ -184,12 +184,12 @@ async def create_match(body: CreateMatchRequest, x_init_data: str = Header(defau
     user = get_or_create_user(tg_id, username)
     require_active_account(user.status, tg_id)
 
-    # 5. Check balance (no lock yet — opponent hasn't joined)
+    # 5. Check balance only if stake > 0
     from decimal import Decimal
-    if user.playable_balance < Decimal(str(stake)):
+    if stake > 0 and user.playable_balance < Decimal(str(stake)):
         raise HTTPException(400, f"Insufficient balance. You have ${float(user.playable_balance):.2f} USDT, need ${stake:.2f}")
 
-   # Validate currency server-side — never trust client
+    # Validate currency server-side — never trust client
     currency = body.currency.upper().strip()
     if currency not in ALLOWED_CURRENCIES:
         raise HTTPException(400, f"Invalid currency. Allowed: {', '.join(ALLOWED_CURRENCIES)}")
@@ -248,7 +248,7 @@ async def join_match(match_id: str, x_init_data: str = Header(default="test")):
 
     stake = game["stake"]
     from decimal import Decimal
-    if user.playable_balance < Decimal(str(stake)):
+    if stake > 0 and user.playable_balance < Decimal(str(stake)):
         raise HTTPException(400, f"Insufficient balance. Need ${stake:.2f} USDT to join.")
 
     # 6. Lock escrow for BOTH players atomically
@@ -285,7 +285,6 @@ async def get_match_info(match_id: str, x_init_data: str = Header(default="test"
         "white_tg":  game["white_tg"],
         "black_tg":  game["black_tg"],
     }
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  WEBSOCKET GAME SERVER

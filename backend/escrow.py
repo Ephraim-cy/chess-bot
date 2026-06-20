@@ -130,6 +130,8 @@ def lock_escrow(match_id: str, white_tg: int, black_tg: int, stake: float) -> Ma
     If one player doesn't have enough balance, the whole operation fails
     and no money moves.
     """
+    if float(stake) == 0:
+        return  # Free game — no escrow needed
     stake_d = Decimal(str(stake)).quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
     white   = get_user(white_tg)
     black   = get_user(black_tg)
