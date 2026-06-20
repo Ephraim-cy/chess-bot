@@ -471,182 +471,215 @@ function ProfileScreen({ onBack }) {
   })
 
   return (
-    <div style={{ minHeight: '100vh', background: '#080B14', color: '#eaeaea', fontFamily: 'sans-serif', paddingBottom: 32 }}>
+    <div className="text-white flex justify-center items-center min-h-screen p-0 sm:p-4 bg-[#03010a] font-sans">
+      <div className="w-full max-w-md bg-[#0a0516] h-screen sm:h-[850px] flex flex-col justify-between shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden border-x border-slate-900 sm:rounded-3xl">
+        
+        {/* ── Top header bar ── */}
+        <header className="px-4 pt-3 pb-2 bg-[#0e071f] flex justify-between items-center border-b border-[#1b1233] shrink-0 z-50">
+          <button onPointerDown={onBack} className="text-gray-400 hover:text-white transition">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+          </button>
+          <div className="font-bold text-base tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-purple-300">My Account</div>
+          <div className="w-6" />
+        </header>
 
-      {/* ── Top header bar ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-        <button onPointerDown={onBack} style={{ background: 'transparent', border: 'none', color: '#6B7280', fontSize: '1.1rem', cursor: 'pointer', padding: '4px 8px', WebkitTapHighlightColor: 'transparent' }}>←</button>
-        <div style={{ fontWeight: 800, color: '#818CF8', fontSize: '1rem' }}>My Account</div>
-      </div>
-
-      {loading && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '60px 20px', color: '#4B5563' }}>
-          <div style={{ fontSize: 32, animation: 'spin 1s linear infinite' }}>⟳</div>
-          <div style={{ fontSize: '.85rem' }}>Loading your profile...</div>
-        </div>
-      )}
-
-      {error && (
-        <div style={{ margin: '20px 16px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, padding: '12px 16px', color: '#FCA5A5', fontSize: '.85rem', textAlign: 'center' }}>
-          {error}
-        </div>
-      )}
-
-      {!loading && !error && (
-        <>
-          {/* ── Avatar + identity card ── */}
-          <div style={{ margin: '20px 16px 0', background: 'linear-gradient(135deg,#111827,#1a2236)', border: '1px solid rgba(99,102,241,.2)', borderRadius: 16, padding: '20px 20px 16px', position: 'relative', overflow: 'hidden' }}>
-            {/* Glow blob */}
-            <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, background: 'rgba(99,102,241,.12)', borderRadius: '50%', filter: 'blur(30px)', pointerEvents: 'none' }} />
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              {/* Avatar circle */}
-              <div style={{ width: 58, height: 58, borderRadius: '50%', background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 900, color: '#fff', flexShrink: 0, boxShadow: '0 0 0 3px rgba(99,102,241,.3)' }}>
-                {avatarLetter}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#eaeaea', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  @{tgUser.username || tgUser.first_name || 'Player'}
-                </div>
-                <div style={{ color: '#4B5563', fontSize: '.75rem', marginTop: 2 }}>
-                  Telegram ID: <span style={{ color: '#6366F1', fontFamily: 'monospace' }}>{tgUser.id || '—'}</span>
-                </div>
-                <div style={{ display: 'inline-block', marginTop: 6, background: profile?.status === 'active' ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)', border: `1px solid ${profile?.status === 'active' ? 'rgba(16,185,129,.4)' : 'rgba(239,68,68,.4)'}`, borderRadius: 20, padding: '2px 10px', fontSize: '.68rem', fontWeight: 700, color: profile?.status === 'active' ? '#10B981' : '#EF4444', letterSpacing: '.5px' }}>
-                  {(profile?.status || 'active').toUpperCase()}
-                </div>
-              </div>
-            </div>
-
-            {/* Total balance hero */}
-            <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.05)' }}>
-              <div style={{ color: '#4B5563', fontSize: '.7rem', fontWeight: 700, letterSpacing: '1px', marginBottom: 4 }}>TOTAL BALANCE</div>
-              <div style={{ fontSize: '2rem', fontWeight: 900, color: '#A5B4FC', letterSpacing: '-1px' }}>
-                ${total.toFixed(2)} <span style={{ fontSize: '.9rem', color: '#6366F1', fontWeight: 700 }}>USDT</span>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Balance breakdown cards ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '10px 16px 0' }}>
-            <div style={{ background: '#111827', border: '1px solid rgba(16,185,129,.2)', borderRadius: 12, padding: '14px' }}>
-              <div style={{ color: '#4B5563', fontSize: '.68rem', fontWeight: 700, letterSpacing: '.8px', marginBottom: 6 }}>AVAILABLE</div>
-              <div style={{ color: '#10B981', fontSize: '1.2rem', fontWeight: 800 }}>${playable.toFixed(2)}</div>
-              <div style={{ color: '#374151', fontSize: '.68rem', marginTop: 3 }}>Ready to play</div>
-            </div>
-            <div style={{ background: '#111827', border: '1px solid rgba(245,158,11,.2)', borderRadius: 12, padding: '14px' }}>
-              <div style={{ color: '#4B5563', fontSize: '.68rem', fontWeight: 700, letterSpacing: '.8px', marginBottom: 6 }}>IN ESCROW</div>
-              <div style={{ color: '#F59E0B', fontSize: '1.2rem', fontWeight: 800 }}>${locked.toFixed(2)}</div>
-              <div style={{ color: '#374151', fontSize: '.68rem', marginTop: 3 }}>Active match</div>
-            </div>
-          </div>
-
-          {/* ── Stats row ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, margin: '10px 16px 0' }}>
-            {[
-              { label: 'GAMES',  value: totalGames, color: '#A5B4FC' },
-              { label: 'WINS',   value: wins,        color: '#10B981' },
-              { label: 'LOSSES', value: losses,      color: '#EF4444' },
-            ].map(s => (
-              <div key={s.label} style={{ background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 12, padding: '12px 10px', textAlign: 'center' }}>
-                <div style={{ color: s.color, fontSize: '1.3rem', fontWeight: 900 }}>{s.value}</div>
-                <div style={{ color: '#4B5563', fontSize: '.62rem', fontWeight: 700, letterSpacing: '.8px', marginTop: 3 }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* ── Deposit / Withdraw action buttons ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '14px 16px 0' }}>
-            <button onPointerDown={() => alert('Deposit flow coming soon.\nSend USDT to your wallet address and contact support.')}
-              style={{ background: 'linear-gradient(135deg,#10B981,#059669)', border: 'none', borderRadius: 12, padding: '13px', color: '#fff', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
-              ⬇️ Deposit
-            </button>
-            <button onPointerDown={() => alert('Withdraw flow coming soon.\nMinimum withdrawal: $5 USDT.')}
-              style={{ background: playable >= 5 ? 'linear-gradient(135deg,#6366F1,#8B5CF6)' : '#1f2937', border: 'none', borderRadius: 12, padding: '13px', color: playable >= 5 ? '#fff' : '#4B5563', fontWeight: 800, fontSize: '.9rem', cursor: playable >= 5 ? 'pointer' : 'not-allowed', WebkitTapHighlightColor: 'transparent' }}>
-              ⬆️ Withdraw
-            </button>
-          </div>
-          <div style={{ margin: '6px 16px 0', color: '#374151', fontSize: '.7rem', textAlign: 'center' }}>
-            Minimum withdrawal: $5.00 USDT · 10% platform fee on winnings
-          </div>
-
-          {/* ── Tab switcher ── */}
-          <div style={{ display: 'flex', gap: 4, margin: '18px 16px 0', background: '#0d1117', borderRadius: 10, padding: 4 }}>
-            <button onPointerDown={() => setTab('overview')} style={tabStyle(tab === 'overview')}>📊 Overview</button>
-            <button onPointerDown={() => setTab('history')}  style={tabStyle(tab === 'history')}>📋 History ({txns.length})</button>
-          </div>
-
-          {/* ── Overview tab ── */}
-          {tab === 'overview' && (
-            <div style={{ margin: '12px 16px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {/* Win rate bar */}
-              <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 12, padding: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ color: '#6B7280', fontSize: '.75rem', fontWeight: 700 }}>WIN RATE</span>
-                  <span style={{ color: '#A5B4FC', fontSize: '.75rem', fontWeight: 800 }}>
-                    {totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0}%
-                  </span>
-                </div>
-                <div style={{ height: 8, background: '#1f2937', borderRadius: 99, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${totalGames > 0 ? (wins / totalGames) * 100 : 0}%`, background: 'linear-gradient(90deg,#10B981,#34D399)', borderRadius: 99, transition: 'width .6s ease' }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-                  <span style={{ color: '#10B981', fontSize: '.68rem' }}>{wins} wins</span>
-                  <span style={{ color: '#EF4444', fontSize: '.68rem' }}>{losses} losses</span>
-                </div>
-              </div>
-
-              {/* Account info rows */}
-              {[
-                { label: 'Account ID',   value: profile?.id ? profile.id.slice(0,8) + '...' : '—', mono: true },
-                { label: 'Telegram ID',  value: tgUser.id || '—', mono: true },
-                { label: 'Username',     value: '@' + (tgUser.username || tgUser.first_name || 'Player'), mono: false },
-                { label: 'Status',       value: (profile?.status || 'active').toUpperCase(), mono: false },
-              ].map(row => (
-                <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 10, padding: '12px 14px' }}>
-                  <span style={{ color: '#6B7280', fontSize: '.8rem' }}>{row.label}</span>
-                  <span style={{ color: '#A5B4FC', fontSize: '.8rem', fontWeight: 700, fontFamily: row.mono ? 'monospace' : 'inherit' }}>{row.value}</span>
-                </div>
-              ))}
+        {/* Scrollable content */}
+        <div className="flex-grow overflow-y-auto no-scrollbar p-3 space-y-4 bg-[#080B14] pb-8">
+          {loading && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '60px 20px', color: '#4B5563' }}>
+              <div style={{ fontSize: 32, animation: 'spin 1s linear infinite' }}>⟳</div>
+              <div style={{ fontSize: '.85rem' }}>Loading your profile...</div>
             </div>
           )}
 
-          {/* ── History tab ── */}
-          {tab === 'history' && (
-            <div style={{ margin: '12px 16px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {txns.length === 0 && (
-                <div style={{ textAlign: 'center', color: '#4B5563', padding: '40px 0', fontSize: '.85rem' }}>
-                  No transactions yet.<br />Play a match to see your history here.
-                </div>
-              )}
-              {txns.map((t, i) => {
-                const m = txMeta(t.type)
-                return (
-                  <div key={t.id || i} style={{ background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    {/* Icon */}
-                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: `${m.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
-                      {m.icon}
+          {error && (
+            <div style={{ margin: '20px 16px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, padding: '12px 16px', color: '#FCA5A5', fontSize: '.85rem', textAlign: 'center' }}>
+              {error}
+            </div>
+          )}
+
+          {!loading && !error && (
+            <>
+              {/* ── Avatar + identity card ── */}
+              <div style={{ background: 'linear-gradient(135deg,#111827,#1a2236)', border: '1px solid rgba(99,102,241,.2)', borderRadius: 16, padding: '20px 20px 16px', position: 'relative', overflow: 'hidden' }}>
+                {/* Glow blob */}
+                <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, background: 'rgba(99,102,241,.12)', borderRadius: '50%', filter: 'blur(30px)', pointerEvents: 'none' }} />
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  {/* Avatar circle */}
+                  <div style={{ width: 58, height: 58, borderRadius: '50%', background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifycontent: 'center', fontSize: '1.5rem', fontWeight: 900, color: '#fff', flexShrink: 0, boxShadow: '0 0 0 3px rgba(99,102,241,.3)' }}>
+                    {avatarLetter}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#eaeaea', whiteSpace: 'nowrap', overflow: 'hidden', textoverflow: 'ellipsis' }}>
+                      @{tgUser.username || tgUser.first_name || 'Player'}
                     </div>
-                    {/* Label + date */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '.82rem', color: '#eaeaea' }}>{m.label}</div>
-                      <div style={{ color: '#4B5563', fontSize: '.68rem', marginTop: 1 }}>{formatDate(t.created_at)}</div>
+                    <div style={{ color: '#4B5563', fontSize: '.75rem', marginTop: 2 }}>
+                      Telegram ID: <span style={{ color: '#6366F1', fontFamily: 'monospace' }}>{tgUser.id || '—'}</span>
                     </div>
-                    {/* Amount */}
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontWeight: 800, fontSize: '.9rem', color: m.color }}>
-                        {m.sign}${parseFloat(t.amount || 0).toFixed(2)}
-                      </div>
-                      <div style={{ fontSize: '.65rem', color: t.status === 'completed' ? '#10B981' : '#F59E0B', marginTop: 1, fontWeight: 700 }}>
-                        {(t.status || 'pending').toUpperCase()}
-                      </div>
+                    <div style={{ display: 'inline-block', marginTop: 6, background: profile?.status === 'active' ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)', border: `1px solid ${profile?.status === 'active' ? 'rgba(16,185,129,.4)' : 'rgba(239,68,68,.4)'}`, borderRadius: 20, padding: '2px 10px', fontSize: '.68rem', fontWeight: 700, color: profile?.status === 'active' ? '#10B981' : '#EF4444', letterSpacing: '.5px' }}>
+                      {(profile?.status || 'active').toUpperCase()}
                     </div>
                   </div>
-                )
-              })}
-            </div>
+                </div>
+
+                {/* Total balance hero */}
+                <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.05)' }}>
+                  <div style={{ color: '#4B5563', fontSize: '.7rem', fontWeight: 700, letterSpacing: '1px', marginBottom: 4 }}>TOTAL BALANCE</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 900, color: '#A5B4FC', letterSpacing: '-1px' }}>
+                    ${total.toFixed(2)} <span style={{ fontSize: '.9rem', color: '#6366F1', fontWeight: 700 }}>USDT</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Balance breakdown cards ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div style={{ background: '#111827', border: '1px solid rgba(16,185,129,.2)', borderRadius: 12, padding: '14px' }}>
+                  <div style={{ color: '#4B5563', fontSize: '.68rem', fontWeight: 700, letterSpacing: '.8px', marginBottom: 6 }}>AVAILABLE</div>
+                  <div style={{ color: '#10B981', fontSize: '1.2rem', fontWeight: 800 }}>${playable.toFixed(2)}</div>
+                  <div style={{ color: '#374151', fontSize: '.68rem', marginTop: 3 }}>Ready to play</div>
+                </div>
+                <div style={{ background: '#111827', border: '1px solid rgba(245,158,11,.2)', borderRadius: 12, padding: '14px' }}>
+                  <div style={{ color: '#4B5563', fontSize: '.68rem', fontWeight: 700, letterSpacing: '.8px', marginBottom: 6 }}>IN ESCROW</div>
+                  <div style={{ color: '#F59E0B', fontSize: '1.2rem', fontWeight: 800 }}>${locked.toFixed(2)}</div>
+                  <div style={{ color: '#374151', fontSize: '.68rem', marginTop: 3 }}>Active match</div>
+                </div>
+              </div>
+
+              {/* ── Stats row ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                {[
+                  { label: 'GAMES',  value: totalGames, color: '#A5B4FC' },
+                  { label: 'WINS',   value: wins,        color: '#10B981' },
+                  { label: 'LOSSES', value: losses,      color: '#EF4444' },
+                ].map(s => (
+                  <div key={s.label} style={{ background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 12, padding: '12px 10px', textAlign: 'center' }}>
+                    <div style={{ color: s.color, fontSize: '1.3rem', fontWeight: 900 }}>{s.value}</div>
+                    <div style={{ color: '#4B5563', fontSize: '.62rem', fontWeight: 700, letterSpacing: '.8px', marginTop: 3 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ── Deposit / Withdraw action buttons ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <button onPointerDown={() => alert('Deposit flow coming soon.\nSend USDT to your wallet address and contact support.')}
+                  style={{ background: 'linear-gradient(135deg,#10B981,#059669)', border: 'none', borderRadius: 12, padding: '13px', color: '#fff', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+                  ⬇️ Deposit
+                </button>
+                <button onPointerDown={() => alert('Withdraw flow coming soon.\nMinimum withdrawal: $5 USDT.')}
+                  style={{ background: playable >= 5 ? 'linear-gradient(135deg,#6366F1,#8B5CF6)' : '#1f2937', border: 'none', borderRadius: 12, padding: '13px', color: playable >= 5 ? '#fff' : '#4B5563', fontWeight: 800, fontSize: '.9rem', cursor: playable >= 5 ? 'pointer' : 'not-allowed', WebkitTapHighlightColor: 'transparent' }}>
+                  ⬆️ Withdraw
+                </button>
+              </div>
+              <div style={{ color: '#374151', fontSize: '.7rem', textAlign: 'center' }}>
+                Minimum withdrawal: $5.00 USDT · 10% platform fee on winnings
+              </div>
+
+              {/* ── Tab switcher ── */}
+              <div style={{ display: 'flex', gap: 4, background: '#0d1117', borderRadius: 10, padding: 4 }}>
+                <button onPointerDown={() => setTab('overview')} style={tabStyle(tab === 'overview')}>📊 Overview</button>
+                <button onPointerDown={() => setTab('history')}  style={tabStyle(tab === 'history')}>📋 History ({txns.length})</button>
+              </div>
+
+              {/* ── Overview tab ── */}
+              {tab === 'overview' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {/* Win rate bar */}
+                  <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 12, padding: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ color: '#6B7280', fontSize: '.75rem', fontWeight: 700 }}>WIN RATE</span>
+                      <span style={{ color: '#A5B4FC', fontSize: '.75rem', fontWeight: 800 }}>
+                        {totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0}%
+                      </span>
+                    </div>
+                    <div style={{ height: 8, background: '#1f2937', borderRadius: 99, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${totalGames > 0 ? (wins / totalGames) * 100 : 0}%`, background: 'linear-gradient(90deg,#10B981,#34D399)', borderRadius: 99, transition: 'width .6s ease' }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                      <span style={{ color: '#10B981', fontSize: '.68rem' }}>{wins} wins</span>
+                      <span style={{ color: '#EF4444', fontSize: '.68rem' }}>{losses} losses</span>
+                    </div>
+                  </div>
+
+                  {/* Account info rows */}
+                  {[
+                    { label: 'Account ID',   value: profile?.id ? profile.id.slice(0,8) + '...' : '—', mono: true },
+                    { label: 'Telegram ID',  value: tgUser.id || '—', mono: true },
+                    { label: 'Username',     value: '@' + (tgUser.username || tgUser.first_name || 'Player'), mono: false },
+                    { label: 'Status',       value: (profile?.status || 'active').toUpperCase(), mono: false },
+                  ].map(row => (
+                    <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 10, padding: '12px 14px' }}>
+                      <span style={{ color: '#6B7280', fontSize: '.8rem' }}>{row.label}</span>
+                      <span style={{ color: '#A5B4FC', fontSize: '.8rem', fontWeight: 700, fontFamily: row.mono ? 'monospace' : 'inherit' }}>{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ── History tab ── */}
+              {tab === 'history' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {txns.length === 0 && (
+                    <div style={{ textAlign: 'center', color: '#4B5563', padding: '40px 0', fontSize: '.85rem' }}>
+                      No transactions yet.<br />Play a match to see your history here.
+                    </div>
+                  )}
+                  {txns.map((t, i) => {
+                    const m = txMeta(t.type)
+                    return (
+                      <div key={t.id || i} style={{ background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                        {/* Icon */}
+                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: `${m.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
+                          {m.icon}
+                        </div>
+                        {/* Label + date */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: '.82rem', color: '#eaeaea' }}>{m.label}</div>
+                          <div style={{ color: '#4B5563', fontSize: '.68rem', marginTop: 1 }}>{formatDate(t.created_at)}</div>
+                        </div>
+                        {/* Amount */}
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ fontWeight: 800, fontSize: '.9rem', color: m.color }}>
+                            {m.sign}${parseFloat(t.amount || 0).toFixed(2)}
+                          </div>
+                          <div style={{ fontSize: '.65rem', color: t.status === 'completed' ? '#10B981' : '#F59E0B', marginTop: 1, fontWeight: 700 }}>
+                            {(t.status || 'pending').toUpperCase()}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
           )}
-        </>
-      )}
+        </div>
+
+        {/* Footer */}
+        <footer className="bg-[#0b0617] border-t border-[#231545] grid grid-cols-5 text-center py-3 text-gray-300 text-xs font-black shrink-0 z-40 shadow-[0_-8px_25px_rgba(139,92,246,0.15)]">
+          <button onPointerDown={onBack} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100">
+            <span className="text-lg">🏠</span> 
+            <span>Home</span>
+          </button>
+          <button onPointerDown={() => alert('Leaderboard is displayed below on the home page.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-150">
+            <span className="text-lg">🏆</span>
+            <span>Rank</span>
+          </button>
+          <button className="text-purple-200 flex flex-col items-center justify-center gap-1 drop-shadow-[0_0_12px_rgba(168,85,247,0.75)]">
+            <span className="text-lg">📜</span>
+            <span>History</span>
+          </button>
+          <button onPointerDown={() => alert('Support Chat coming soon.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100">
+            <span className="text-lg">💬</span>
+            <span>Chat</span>
+          </button>
+          <button onPointerDown={onBack} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100">
+            <span className="text-lg">👤</span>
+            <span>Me</span>
+          </button>
+        </footer>
+
+      </div>
     </div>
   )
 }
@@ -707,6 +740,8 @@ export default function App() {
   const [userBalance, setUserBalance] = useState(null)
   const [status, setStatus]   = useState('')
   const [loading, setLoading] = useState(false)
+  const [currentStep, setCurrentStep] = useState(0)
+  const [betPanelOpen, setBetPanelOpen] = useState(false)
 
   // multiplayer
   const [matchId, setMatchId]   = useState('')
@@ -740,6 +775,44 @@ export default function App() {
   const colorRef  = useRef(null)
 
   function bump() { setTick(t => t + 1) }
+
+  // Step 1: Mode Select
+  const handleSelectMode = (selectedMode) => {
+    setMode(selectedMode)
+    setCurrentStep(1)
+    setStake(selectedMode === 'computer' ? 0 : 5)
+    setBetPanelOpen(false)
+    setStatus('')
+  }
+
+  // Step 2: Style Select ('free' or 'bet')
+  const handleSelectStyle = (styleType) => {
+    if (currentStep < 1) {
+      setStatus('⚠️ First choice who u wanna play with!')
+      return
+    }
+    if (mode === 'computer' && styleType === 'bet') {
+      setStatus("❌ Play With Bet is unacceptable against AI mode! Choose 'Play For Free'.")
+      return
+    }
+
+    if (styleType === 'free') {
+      setStake(0)
+      setCurrentStep(2)
+      setBetPanelOpen(false)
+      setStatus('')
+    } else {
+      setBetPanelOpen(true)
+      setStatus('')
+    }
+  }
+
+  // Confirm Stake Amount
+  const handleConfirmStake = (amount) => {
+    setStake(amount)
+    setCurrentStep(2)
+    setStatus('')
+  }
 
   // ─── AUTO-REGISTER: runs once on load ─────────────────────────────────────
   // Calls /api/me — backend creates user row if first visit, returns profile if existing.
@@ -1047,411 +1120,683 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
   }
   const checkedKingSq = (screen === 'game') ? getCheckedKingSq() : null
 
-  // ─── HOME ─────────────────────────────────────────────────────────────────
-  if (screen === 'home') return (
-    <div style={S.page}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', maxWidth: 440 }}>
-        <div style={{ fontSize: 52, lineHeight: 1 }}>♟</div>
-        <button onPointerDown={() => setScreen('profile')} style={{ background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 10, padding: '8px 14px', color: '#A5B4FC', fontWeight: 700, fontSize: '.78rem', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', marginTop: 6 }}>
-          👤 My Account
-        </button>
-      </div>
-      <h1 style={{ fontSize: '1.9rem', fontWeight: 900, color: '#818CF8', letterSpacing: '-1px', margin: 0 }}>
-        CHESS ARENA
-      </h1>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <p style={{ color: '#6B7280', fontSize: '.8rem', margin: 0 }}>
-        @{tgUser.username || 'Player'}
-        {userBalance !== null && (
-          <span style={{ color: '#10B981', fontWeight: 700, marginLeft: 8 }}>
-            ${userBalance.toFixed(2)}
-          </span>
-        )}
-      </p>
-        <button onPointerDown={() => { helpFromRef.current = 'home'; setScreen('help') }}
-          style={{ background: 'rgba(99,102,241,.15)', border: '1px solid rgba(99,102,241,.3)', color: '#818CF8', borderRadius: '50%', width: 28, height: 28, fontWeight: 800, fontSize: '.85rem', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}>
-          ?
-        </button>
-      </div>
+  // ─── DYNAMIC NOTIFICATION BANNERS ──────────────────────────────────────────
+  let notificationText = '👉 Step 1: Choose who you want to play with below!'
+  let notificationClass = 'text-amber-400 bg-amber-500/10 border-amber-500/20'
 
-      <div style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 440 }}>
-        <button onPointerDown={() => setMode('computer')} style={S.modeBtn(mode === 'computer')}>🤖 vs Computer</button>
-        <button onPointerDown={() => setMode('human')}    style={S.modeBtn(mode === 'human')}>⚔️ vs Human</button>
-      </div>
+  if (status && (status.startsWith('⚠️') || status.startsWith('❌'))) {
+    notificationText = status
+    notificationClass = 'text-red-400 bg-red-500/10 border-red-500/30 font-black shadow-[0_0_15px_rgba(239,68,68,0.15)]'
+  } else if (currentStep === 0) {
+    notificationText = '👉 Step 1: Choose who you want to play with below!'
+    notificationClass = 'text-amber-400 bg-amber-500/10 border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.05)]'
+  } else if (currentStep === 1) {
+    if (mode === 'computer') {
+      notificationText = "👉 Step 2: Betting unavailable vs AI. Tap 'Play For Free' to continue!"
+      notificationClass = 'text-blue-400 bg-blue-500/10 border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]'
+    } else {
+      notificationText = "👉 Step 2: Choose 'Play With Bet' or 'Play For Free'!"
+      notificationClass = 'text-purple-400 bg-purple-500/10 border-purple-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]'
+    }
+  } else if (currentStep === 2) {
+    const modeLabel = mode === 'computer' ? 'VS AI' : 'VS HUMAN'
+    const stakeLabel = stake === 0 ? 'FREE' : `${cfg.symbol}${stake}`
+    const promptTarget = mode === 'computer' ? 'an AI Difficulty Level' : 'Find/Create Match'
+    notificationText = `✅ Setup Ready (${modeLabel} - ${stakeLabel})! Now choose ${promptTarget} below.`
+    notificationClass = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+  }
 
-      {mode === 'computer' && (
-        <div style={S.box}>
-          <p style={{ color: '#6B7280', fontSize: '.72rem', fontWeight: 700, letterSpacing: '1px', marginBottom: 10 }}>PLAY AS</p>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            <button onPointerDown={() => setPlayerColor('white')} style={S.diffBtn(playerColor === 'white', '#F9FAFB')}>♙ White</button>
-            <button onPointerDown={() => setPlayerColor('black')} style={S.diffBtn(playerColor === 'black', '#818CF8')}>♟ Black</button>
+  // ─── RENDERING HELPERS ─────────────────────────────────────────────────────
+  function renderHome() {
+    return (
+      <main className="p-3 space-y-4 flex-grow overflow-y-auto no-scrollbar">
+        {/* Step 1 Profile & Balance Grid */}
+        <div className="space-y-1">
+          <div className="grid grid-cols-4 gap-1.5 text-[10px] text-center font-semibold">
+            <div 
+              onPointerDown={() => setScreen('profile')} 
+              className="bg-[#140b29] border border-[#231742] py-2 rounded-xl flex flex-col items-center justify-center gap-0.5 hover:border-purple-500/40 transition cursor-pointer"
+            >
+              <span className="text-purple-400 text-sm drop-shadow-[0_0_5px_rgba(168,85,247,0.4)]">👤+</span>
+              <span className="text-gray-300 text-[9px]">Profile</span>
+            </div>
+            <div className="bg-[#140b29] border border-[#231742] py-2 rounded-xl flex flex-col items-center justify-center">
+              <span className="text-emerald-400 text-[11px] drop-shadow-[0_0_5px_rgba(52,211,153,0.3)]">🖨️ Balance</span>
+              <span className="text-[#26d07c] font-black text-[9px]">
+                {userBalance !== null ? `$${userBalance.toFixed(2)}` : '$0.00'}
+              </span>
+            </div>
+            <div 
+              onPointerDown={() => { helpFromRef.current = 'home'; setScreen('help') }}
+              className="bg-[#140b29] border border-[#231742] py-2 rounded-xl flex flex-col items-center justify-center gap-0.5 hover:border-purple-500/40 transition cursor-pointer"
+            >
+              <span className="text-purple-400 text-sm drop-shadow-[0_0_5px_rgba(168,85,247,0.4)]">🎁</span>
+              <span className="text-gray-300 text-[9px]">Promotions</span>
+            </div>
+            <div 
+              onPointerDown={() => alert('Invite Friends: Coming Soon!')} 
+              className="bg-[#140b29] border border-[#231742] py-2 rounded-xl flex flex-col items-center justify-center gap-0.5 hover:border-purple-500/40 transition cursor-pointer"
+            >
+              <span className="text-purple-400 text-sm drop-shadow-[0_0_5px_rgba(168,85,247,0.4)]">👥+</span>
+              <span className="text-gray-300 text-[9px]">Invite Friends</span>
+            </div>
           </div>
-          <p style={{ color: '#6B7280', fontSize: '.72rem', fontWeight: 700, letterSpacing: '1px', marginBottom: 10 }}>DIFFICULTY</p>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-            <button onPointerDown={() => setDifficulty('easy')}   style={S.diffBtn(difficulty === 'easy',   '#10B981')}>🟢 Easy</button>
-            <button onPointerDown={() => setDifficulty('medium')} style={S.diffBtn(difficulty === 'medium', '#F59E0B')}>🟡 Medium</button>
-            <button onPointerDown={() => setDifficulty('hard')}   style={S.diffBtn(difficulty === 'hard',   '#EF4444')}>🔴 Hard</button>
-          </div>
-          {difficulty === 'easy' && (
-            <p style={{ color: '#10B981', fontSize: '.7rem', margin: '8px 0 14px' }}>
-              💡 Easy shows all possible moves when you tap a piece
-            </p>
-          )}
-          <button onPointerDown={startVsComputer} style={S.btn('linear-gradient(135deg,#6366F1,#8B5CF6)', false)}>
-            🤖 Play vs Computer
-          </button>
         </div>
-      )}
 
-      {mode === 'human' && (
-        <>
-          <div style={S.box}>
-            {/* Currency selector */}
-          <p style={{ color: '#6B7280', fontSize: '.72rem', fontWeight: 700, letterSpacing: '1px', marginBottom: 8 }}>CURRENCY</p>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-            {Object.entries(CURRENCY_CONFIG).map(([key, c]) => (
-              <button key={key} onPointerDown={() => { setCurrency(key); setStake(c.stakes[1]) }}
-                style={{
-                  flex: 1, padding: '8px 4px', borderRadius: 8,
-                  border: currency === key ? `2px solid ${c.color}` : '1px solid #1f2937',
-                  background: currency === key ? `${c.color}22` : 'transparent',
-                  color: currency === key ? c.color : '#6B7280',
-                  fontWeight: 700, fontSize: '.8rem', cursor: 'pointer',
-                  WebkitTapHighlightColor: 'transparent'
-                }}>
-                {c.icon} {key}
-              </button>
-            ))}
-          </div>
-          <p style={{ color: '#4B5563', fontSize: '.68rem', margin: '-8px 0 12px' }}>{cfg.description}</p>
+        {/* Hero Section */}
+        <section className="relative bg-gradient-to-b from-[#1f1047] via-[#100727] to-[#0a0516] rounded-2xl p-5 border border-[#482e99]/60 overflow-hidden text-center flex flex-col items-center justify-center min-h-[165px] shadow-[0_0_25px_rgba(139,92,246,0.25)]">
+          <div className="absolute -right-6 -top-6 w-28 h-28 bg-purple-500/10 rounded-full blur-2xl pointer-events-none"></div>
+          <div className="absolute -left-6 -bottom-6 w-28 h-28 bg-blue-500/15 rounded-full blur-2xl pointer-events-none"></div>
 
-          {/* Stake selector — amounts change per currency */}
-          <p style={{ color: '#6B7280', fontSize: '.72rem', fontWeight: 700, letterSpacing: '1px', marginBottom: '10px' }}>
-            SET STAKE ({cfg.unit})
+          <h1 className="text-3xl font-black tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-300 to-indigo-400 drop-shadow-[0_0_15px_rgba(168,85,247,0.7)]">
+            CHESS ARENA
+          </h1>
+          <p className="text-[10px] uppercase font-bold tracking-widest text-purple-300 mt-1 flex items-center gap-2">
+            Play <span className="text-purple-500 text-xs shadow-sm">•</span> Compete <span className="text-purple-500 text-xs">•</span> Win
           </p>
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-            {cfg.stakes.map(v => (
-              <button key={v} onPointerDown={() => setStake(v)} style={S.sBtn(stake === v)}>
-                {v === 0 ? '🆓 FREE' : `${cfg.symbol}${v}`}
-              </button>
-            ))}
+
+          <div className="mt-4 w-full bg-[#1b0e38]/80 border border-purple-500/30 rounded-xl py-2 px-3.5 text-left flex items-center justify-between gap-2 shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
+            <div className="truncate">
+              <span className="text-[9px] font-black uppercase bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(245,158,11,0.5)] mr-1.5 inline-block">PROMO</span>
+              <span className="text-[11px] text-purple-100 font-semibold tracking-wide">Earn double tokens on matches today!</span>
+            </div>
+            <span className="text-amber-400 text-xs shrink-0 drop-shadow-[0_0_4px_rgba(245,158,11,0.5)]">⚡</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', textAlign: 'center', background: '#1a2236', borderRadius: '8px', padding: '12px' }}>
-            {stake === 0 ? (
-              <div style={{ gridColumn: '1/-1', color: '#10B981', fontWeight: 800, fontSize: '.9rem', padding: '4px 0' }}>
-                🆓 Free game — no money, just fun
+        </section>
+
+        {/* Dynamic Flow Notification Banner */}
+        <div className={`text-center text-xs font-bold py-2.5 px-3 rounded-xl transition-all duration-300 ${notificationClass}`}>
+          {notificationText}
+        </div>
+
+        {/* Step 1: Select Mode */}
+        <div className="space-y-1.5">
+          <label className="text-[9px] font-black tracking-widest text-purple-400/80 uppercase block">1. Select Mode</label>
+          <div className="grid grid-cols-2 gap-3">
+            <div 
+              onPointerDown={() => handleSelectMode('computer')} 
+              className={`rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition duration-200 ${
+                mode === 'computer' 
+                  ? "bg-[#130d2d] border-2 border-blue-500 bg-blue-950/20 shadow-[0_0_15px_rgba(59,130,246,0.35)]" 
+                  : "bg-[#110924] border border-[#26184a] shadow-lg hover:border-blue-500/30"
+              }`}
+            >
+              <div className="w-11 h-11 mb-2 bg-gradient-to-b from-blue-500/15 to-transparent rounded-full flex items-center justify-center text-2xl drop-shadow-[0_0_8px_rgba(59,130,246,0.3)]">🤖</div>
+              <h3 className="font-black text-sm tracking-wide text-gray-200">VS AI</h3>
+              <p className="text-[10px] text-gray-500 mt-0.5">Practice Mode</p>
+            </div>
+
+            <div 
+              onPointerDown={() => handleSelectMode('human')} 
+              className={`rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition duration-200 ${
+                mode === 'human' 
+                  ? "bg-[#190d33] border-2 border-purple-500 bg-purple-950/20 shadow-[0_0_15px_rgba(16,185,129,0.35)]" 
+                  : "bg-[#110924] border border-[#26184a] shadow-lg hover:border-purple-500/30"
+              }`}
+            >
+              <div className="w-11 h-11 mb-2 bg-gradient-to-b from-purple-500/15 to-transparent rounded-full flex items-center justify-center text-xl drop-shadow-[0_0_8px_rgba(168,85,247,0.3)]">⚔️</div>
+              <h3 className="font-black text-sm tracking-wide text-gray-200">VS HUMAN</h3>
+              <p className="text-[10px] text-gray-500 mt-0.5">Online Mode</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Step 2: Select Entry Style */}
+        <div className="space-y-1.5">
+          <label className="text-[9px] font-black tracking-widest text-purple-400/80 uppercase block">2. Select Entry Style</label>
+          <div className="space-y-2">
+            <button 
+              onPointerDown={() => handleSelectStyle('bet')} 
+              className={`w-full bg-gradient-to-r from-[#8a6207] via-[#e6b82e] to-[#8a6207] text-slate-950 font-black text-xs py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-[0_4px_15px_rgba(230,184,46,0.25)] transition tracking-wider uppercase border border-yellow-400/30 ${
+                mode === 'computer' ? 'opacity-40 cursor-not-allowed' : ''
+              }`}
+            >
+              🪙 Play With Bet <span className={`text-[10px] inline-block transition-transform duration-200 ${betPanelOpen ? 'rotate-90' : ''}`}>❯</span>
+            </button>
+
+            {/* Bet Panel */}
+            <section className={`bet-panel-transition ${betPanelOpen ? 'max-h-[300px] opacity-100' : 'bet-panel-hidden'} bg-[#0e071f] border border-[#2b1b54] rounded-xl p-3.5 space-y-4 shadow-inner`}>
+              <div>
+                <div className="grid grid-cols-3 gap-2 text-xs font-bold">
+                  {Object.entries(CURRENCY_CONFIG).map(([key, c]) => (
+                    <button 
+                      key={key} 
+                      onPointerDown={() => { setCurrency(key); setStake(c.stakes[1]); setCurrentStep(1); }}
+                      className={`py-2 rounded-lg flex items-center justify-center gap-1.5 transition ${
+                        currency === key 
+                          ? `bg-[#0f0921] border-2 border-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.2)]` 
+                          : 'bg-[#0f0921] border border-[#231742] text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {c.icon} {key}
+                    </button>
+                  ))}
+                </div>
               </div>
-            ) : (
-              <>
-                <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>Pool</div><div style={{ color: '#A5B4FC', fontWeight: 800 }}>{cfg.symbol}{pool.toFixed(cfg.decimals)}</div></div>
-                <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>You Win</div><div style={{ color: '#10B981', fontWeight: 800 }}>{cfg.symbol}{win.toFixed(cfg.decimals)}</div></div>
-                <div><div style={{ color: '#6B7280', fontSize: '.7rem', marginBottom: 3 }}>Fee</div><div style={{ color: '#6B7280', fontWeight: 800 }}>{cfg.symbol}{fee.toFixed(cfg.decimals)}</div></div>
-              </>
-            )}
-          </div>
-          </div>
-          {/* Quick matchmaking — preferred path */}
-          <button onPointerDown={findMatch} disabled={loading} style={S.btn('linear-gradient(135deg,#10B981,#059669)', loading)}>
-            🔍 Find Match (Auto)
-          </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', maxWidth: 440 }}>
-            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.06)' }} />
-            <span style={{ color: '#374151', fontSize: '.72rem', fontWeight: 600 }}>OR CREATE MANUALLY</span>
-            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.06)' }} />
-          </div>
-          <button onPointerDown={createMatch} disabled={loading} style={S.btn('linear-gradient(135deg,#6366F1,#8B5CF6)', loading)}>
-            {loading ? 'Creating...' : '⚔️ Create New Match'}
-          </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', maxWidth: 440 }}>
-            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.06)' }} />
-            <span style={{ color: '#4B5563', fontSize: '.78rem', fontWeight: 600 }}>OR JOIN</span>
-            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.06)' }} />
-          </div>
-          <div style={S.box}>
-            <p style={{ color: '#6B7280', fontSize: '.72rem', fontWeight: 700, letterSpacing: '1px', marginBottom: '10px' }}>JOIN WITH MATCH ID</p>
-            <input value={joinId} onChange={e => setJoinId(e.target.value)} placeholder="Paste match ID here..."
-              style={{ width: '100%', background: '#0f1f3d', border: '1px solid #1a3a5c', borderRadius: '8px', padding: '11px', color: '#eaeaea', fontSize: '.9rem', marginBottom: '10px', boxSizing: 'border-box' }} />
-            <button onPointerDown={joinMatch} disabled={loading || !joinId.trim()} style={S.btn('linear-gradient(135deg,#3B82F6,#6366F1)', loading || !joinId.trim())}>
-              {loading ? 'Joining...' : '🚀 Join Match'}
+              <div>
+                <label className="text-[9px] font-bold tracking-widest text-gray-400 uppercase block mb-2">Select Stake Amount ({currency})</label>
+                <div className="grid grid-cols-5 gap-1.5 text-[11px] font-bold">
+                  {cfg.stakes.filter(s => s > 0).map(s => (
+                    <button 
+                      key={s} 
+                      onPointerDown={() => handleConfirmStake(s)} 
+                      className={`py-2 rounded transition ${
+                        stake === s 
+                          ? "bg-emerald-600 border border-emerald-400 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)] font-black" 
+                          : "bg-[#120a26] border border-[#221640] text-gray-300 hover:border-purple-500"
+                      }`}
+                    >
+                      {cfg.symbol}{s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <button 
+              onPointerDown={() => handleSelectStyle('free')} 
+              className={`w-full bg-gradient-to-r from-[#391363] to-[#5c209e] border border-purple-500/50 text-purple-100 font-black text-xs py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-lg uppercase tracking-wider ${
+                stake === 0 && currentStep >= 2 ? 'border-2 border-purple-400 bg-purple-900/40' : ''
+              }`}
+            >
+              🎮 Play For Free
             </button>
           </div>
-        </>
-      )}
-
-      {status && (
-        <div style={{ background: 'rgba(99,102,241,.1)', border: '1px solid rgba(99,102,241,.3)', borderRadius: '8px', padding: '10px 16px', color: '#A5B4FC', fontSize: '.85rem', textAlign: 'center', width: '100%', maxWidth: 440 }}>
-          {status}
         </div>
-      )}
-    </div>
-  )
 
-  // ─── PROFILE ──────────────────────────────────────────────────────────────
-  if (screen === 'profile') return <ProfileScreen onBack={() => setScreen('home')} />
+        {/* Step 3: Game Actions */}
+        <div className="space-y-1.5">
+          <label className="text-[9px] font-black tracking-widest text-purple-400/80 uppercase block">3. Start Game Action</label>
+          
+          {mode === 'human' ? (
+            <div className="grid grid-cols-2 gap-2">
+              <button 
+                onPointerDown={() => {
+                  if (currentStep < 2) {
+                    setStatus('⚠️ Please choose Play With Bet or Play For Free first!')
+                    return
+                  }
+                  findMatch()
+                }} 
+                className="w-full bg-gradient-to-r from-[#059652] to-[#05a85c] text-white font-black text-xs py-3.5 rounded-xl flex items-center justify-center gap-1.5 shadow-[0_4px_12px_rgba(5,150,82,0.3)] hover:brightness-110 transition tracking-wider uppercase"
+              >
+                🔍 Find Match
+              </button>
+              <button 
+                onPointerDown={() => {
+                  if (currentStep < 2) {
+                    setStatus('⚠️ Please choose Play With Bet or Play For Free first!')
+                    return
+                  }
+                  createMatch()
+                }} 
+                className="w-full bg-gradient-to-r from-[#5c1a9e] to-[#6d20bd] text-white font-black text-xs py-3.5 rounded-xl flex items-center justify-center gap-1.5 shadow-[0_4px_12px_rgba(92,26,158,0.3)] hover:brightness-110 transition tracking-wider uppercase"
+              >
+                ⚔️ Create Match
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              <button 
+                onPointerDown={() => {
+                  setDifficulty('easy')
+                  setPlayerColor('white')
+                  setCurrentStep(2)
+                  startVsComputer()
+                }} 
+                className="bg-gradient-to-b from-emerald-950/80 to-emerald-900/60 border border-emerald-500/50 text-emerald-300 font-black text-xs py-3.5 rounded-xl flex flex-col items-center justify-center transition tracking-wider uppercase shadow-[0_4px_10px_rgba(16,185,129,0.15)]"
+              >
+                <span className="text-sm mb-0.5 drop-shadow-[0_0_5px_rgba(16,185,129,0.6)]">🟢</span> Beginner
+              </button>
+              <button 
+                onPointerDown={() => {
+                  setDifficulty('medium')
+                  setPlayerColor('white')
+                  setCurrentStep(2)
+                  startVsComputer()
+                }} 
+                className="bg-gradient-to-b from-amber-950/80 to-amber-900/60 border border-amber-500/50 text-amber-300 font-black text-xs py-3.5 rounded-xl flex flex-col items-center justify-center transition tracking-wider uppercase shadow-[0_4px_10px_rgba(245,158,11,0.15)]"
+              >
+                <span className="text-sm mb-0.5 drop-shadow-[0_0_5px_rgba(245,158,11,0.6)]">🟡</span> Medium
+              </button>
+              <button 
+                onPointerDown={() => {
+                  setDifficulty('hard')
+                  setPlayerColor('white')
+                  setCurrentStep(2)
+                  startVsComputer()
+                }} 
+                className="bg-gradient-to-b from-rose-950/80 to-rose-900/60 border border-rose-500/50 text-rose-300 font-black text-xs py-3.5 rounded-xl flex flex-col items-center justify-center transition tracking-wider uppercase shadow-[0_4px_10px_rgba(244,63,94,0.15)]"
+              >
+                <span className="text-sm mb-0.5 drop-shadow-[0_0_5px_rgba(244,63,94,0.6)]">🔴</span> Hard
+              </button>
+            </div>
+          )}
+        </div>
 
-// ─── HELP ─────────────────────────────────────────────────────────────────
-  if (screen === 'help') {
+        {/* Divider */}
+        <div className="relative flex items-center justify-center py-1">
+          <div className="flex-grow border-t border-[#221644]"></div>
+          <span className="flex-shrink mx-3 text-[9px] font-black text-gray-500 tracking-widest uppercase">Or Join</span>
+          <div className="flex-grow border-t border-[#221644]"></div>
+        </div>
+
+        {/* Join Match ID Panel */}
+        <div className="bg-[#0d071f] border border-[#25174a] p-3 rounded-xl flex gap-2 items-center shadow-inner">
+          <input 
+            type="text" 
+            placeholder="Paste match ID..." 
+            value={joinId}
+            onChange={e => setJoinId(e.target.value)}
+            className="bg-[#070312] border border-[#231742] rounded-lg px-3 py-2 text-xs flex-grow focus:outline-none focus:border-purple-500 text-gray-200 placeholder-gray-600 transition" 
+          />
+          <button 
+            onPointerDown={joinMatch} 
+            className="bg-gradient-to-r from-[#4d1991] to-[#5c20bd] text-white font-black text-xs py-2 px-3.5 rounded-lg whitespace-nowrap shadow-md"
+          >
+            🔗 Join Match
+          </button>
+        </div>
+
+        {/* Other Games */}
+        <section className="space-y-2 pt-1">
+          <div className="relative flex items-center justify-between">
+            <span className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Other Games</span>
+            <div className="flex-grow ml-3 border-t border-[#1f143d]"></div>
+          </div>
+          <div className="grid grid-cols-4 gap-2 text-[10px] font-black text-center">
+            <div onPointerDown={() => alert('Ludo is Coming Soon!')} className="bg-[#110924] border border-[#231644] py-3.5 px-1 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-[#1a0e36] hover:border-purple-500/40 transition duration-150 shadow-md">
+              <span className="text-xl drop-shadow-[0_0_4px_rgba(245,158,11,0.3)]">🎲</span> <span className="text-gray-300 tracking-wide">LUDO</span>
+            </div>
+            <div onPointerDown={() => alert('Poker is Coming Soon!')} className="bg-[#110924] border border-[#231644] py-3.5 px-1 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-[#1a0e36] hover:border-purple-500/40 transition duration-150 shadow-md">
+              <span className="text-xl drop-shadow-[0_0_4px_rgba(239,68,68,0.3)]">🃏</span> <span className="text-gray-300 tracking-wide">POKER</span>
+            </div>
+            <div onPointerDown={() => alert('FIFA is Coming Soon!')} className="bg-[#110924] border border-[#231644] py-3.5 px-1 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-[#1a0e36] hover:border-purple-500/40 transition duration-150 shadow-md">
+              <span className="text-xl drop-shadow-[0_0_4px_rgba(59,130,246,0.3)]">⚽</span> <span className="text-gray-300 tracking-wide">FIFA</span>
+            </div>
+            <div onPointerDown={() => alert('More Games Coming Soon!')} className="bg-[#110924] border border-[#231644] py-3.5 px-1 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-[#1a0e36] hover:border-purple-500/40 transition duration-150 shadow-md">
+              <span className="text-xl drop-shadow-[0_0_4px_rgba(168,85,247,0.3)]">🎯</span> <span className="text-purple-400 text-[8px] leading-tight font-black uppercase">MORE</span>
+            </div>
+          </div>
+        </section>
+
+        {/* Leaderboard */}
+        <section className="space-y-2 pt-1">
+          <div className="relative flex items-center justify-between">
+            <span className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Leaderboard</span>
+            <div className="flex-grow ml-3 border-t border-[#1f143d]"></div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-xs font-semibold">
+            <div className="bg-[#110924] border border-[#26174a] p-2.5 rounded-xl flex items-center gap-2 shadow-md">
+              <span className="text-base drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]">🥇</span>
+              <div className="w-6 h-6 rounded-full bg-purple-950/80 border border-purple-500/40 flex items-center justify-center text-[10px]">👤</div>
+              <div>
+                <p className="text-[10px] font-bold text-white truncate max-w-[55px]">PlayerA</p>
+                <p className="text-[9px] text-amber-400 font-black tracking-wide">2500 ELO</p>
+              </div>
+            </div>
+            <div className="bg-[#110924] border border-[#26174a] p-2.5 rounded-xl flex items-center gap-2 shadow-md">
+              <span className="text-base drop-shadow-[0_0_5px_rgba(148,163,184,0.5)]">🥈</span>
+              <div className="w-6 h-6 rounded-full bg-purple-950/80 border border-purple-500/40 flex items-center justify-center text-[10px]">👤</div>
+              <div>
+                <p className="text-[10px] font-bold text-white truncate max-w-[55px]">PlayerB</p>
+                <p className="text-[9px] text-amber-400 font-black tracking-wide">2400 ELO</p>
+              </div>
+            </div>
+            <div className="bg-[#110924] border border-[#26174a] p-2.5 rounded-xl flex items-center gap-2 shadow-md">
+              <span className="text-base drop-shadow-[0_0_5px_rgba(180,83,9,0.5)]">🥉</span>
+              <div className="w-6 h-6 rounded-full bg-purple-950/80 border border-purple-500/40 flex items-center justify-center text-[10px]">👤</div>
+              <div>
+                <p className="text-[10px] font-bold text-white truncate max-w-[55px]">PlayerC</p>
+                <p className="text-[9px] text-amber-400 font-black tracking-wide">2300 ELO</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    )
+  }
+
+  function renderHelp() {
     const Section = ({ title, children }) => (
-      <div style={{ ...S.box, marginBottom: 0 }}>
-        <p style={{ color: '#818CF8', fontSize: '.78rem', fontWeight: 800, letterSpacing: '1px', marginBottom: 10 }}>{title}</p>
+      <div className="bg-[#111827] border border-white/5 rounded-xl p-4 w-full">
+        <p className="text-indigo-400 text-xs font-black tracking-wider uppercase mb-2.5">{title}</p>
         {children}
       </div>
     )
-    const Row = ({ label, value, color = '#A5B4FC' }) => (
-      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
-        <span style={{ color: '#6B7280', fontSize: '.82rem' }}>{label}</span>
-        <span style={{ color, fontSize: '.82rem', fontWeight: 700 }}>{value}</span>
+    const Row = ({ label, value, colorClass = 'text-indigo-300' }) => (
+      <div className="flex justify-between py-1.5 border-b border-white/5 text-xs">
+        <span className="text-gray-500">{label}</span>
+        <span className={`${colorClass} font-bold`}>{value}</span>
       </div>
     )
     const P = ({ children }) => (
-      <p style={{ color: '#9CA3AF', fontSize: '.82rem', lineHeight: 1.6, margin: '0 0 8px' }}>{children}</p>
+      <p className="text-gray-400 text-xs leading-relaxed mb-2">{children}</p>
     )
 
     return (
-      <div style={{ ...S.page, gap: 10 }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 440 }}>
-          <button onPointerDown={() => setScreen(helpFromRef.current)}
-            style={{ background: 'transparent', border: '1px solid #1f2937', color: '#6B7280', padding: '7px 14px', borderRadius: 8, cursor: 'pointer', fontSize: '.82rem', WebkitTapHighlightColor: 'transparent' }}>
-            ← Back
-          </button>
-          <span style={{ fontWeight: 800, color: '#818CF8', fontSize: '.95rem' }}>📖 Help & Rules</span>
-          <div style={{ width: 60 }} />
+      <div className="text-white flex justify-center items-center min-h-screen p-0 sm:p-4 bg-[#03010a] font-sans">
+        <div className="w-full max-w-md bg-[#0a0516] h-screen sm:h-[850px] flex flex-col justify-between shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden border-x border-slate-900 sm:rounded-3xl">
+          {/* Header */}
+          <header className="px-4 pt-3 pb-2 bg-[#0e071f] flex justify-between items-center border-b border-[#1b1233] shrink-0 z-50">
+            <button onPointerDown={() => setScreen(helpFromRef.current)} className="text-gray-400 hover:text-white transition">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+            </button>
+            <div className="font-bold text-base tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-purple-300">Help & Rules</div>
+            <div className="w-6" />
+          </header>
+
+          {/* Scrollable content */}
+          <main className="p-3 space-y-4 flex-grow overflow-y-auto no-scrollbar pb-8 bg-[#080B14]">
+            <Section title="♟ HOW TO PLAY">
+              <P>Tap any of your pieces to select it. Legal moves appear as dots on the board. Tap a dot to move there. Tap a different piece to switch selection.</P>
+              <P>Capture squares show a ring around the enemy piece. The goal is to checkmate the opponent's king — trap it so it cannot escape.</P>
+            </Section>
+
+            <Section title="🎨 BOARD COLOURS">
+              <Row label="🟨 Yellow / Brown" value="Normal squares" />
+              <Row label="🟩 Green" value="Last move (from → to)" colorClass="text-lime-400" />
+              <Row label="🟪 Purple" value="Selected piece" colorClass="text-indigo-400" />
+              <Row label="🔴 Red" value="King in check" colorClass="text-rose-500" />
+              <Row label="⚪ White dot" value="Legal move target" />
+              <Row label="🟢 Green dot" value="Legal move (Easy mode hint)" colorClass="text-emerald-400" />
+            </Section>
+
+            <Section title="♟ PIECE VALUES">
+              <Row label="♙ Pawn"   value="1 point" />
+              <Row label="♘ Knight" value="3 points" />
+              <Row label="♗ Bishop" value="3 points" />
+              <Row label="♖ Rook"   value="5 points" />
+              <Row label="♕ Queen"  value="9 points" />
+              <Row label="♔ King"   value="∞ — protect at all costs" colorClass="text-rose-500" />
+            </Section>
+
+            <Section title="💰 CURRENCIES">
+              {Object.entries(CURRENCY_CONFIG).map(([key, c]) => (
+                <Row key={key} label={`${c.icon} ${key}`} value={c.description.split('—')[0].trim()} colorClass="text-indigo-300" />
+              ))}
+              <P className="mt-2">All balances are held in a secure escrow on the server. Stakes are locked the moment both players join. You are never charged unless a complete match is played.</P>
+            </Section>
+
+            <Section title="🏆 PRIZE STRUCTURE">
+              <P>When you win a match:</P>
+              <Row label="Your stake" value="Returned" colorClass="text-emerald-400" />
+              <Row label="Opponent's stake" value="90% to you" colorClass="text-emerald-400" />
+              <Row label="Platform fee" value="10% rake" colorClass="text-gray-500" />
+              <P>On a draw, both players receive their original stake back. No rake is charged on draws.</P>
+            </Section>
+
+            <Section title="🤖 VS COMPUTER MODES">
+              <Row label="🟢 Easy"   value="Random legal moves — perfect for beginners" />
+              <Row label="🟡 Medium" value="2-ply minimax — plays solid, won't blunder big pieces" />
+              <Row label="🔴 Hard"   value="3-ply minimax + alpha-beta — tactical, punishes mistakes" />
+              <P>Computer moves are computed locally on your device — no internet needed, instant response.</P>
+            </Section>
+
+            <Section title="🔒 SECURITY">
+              <P>Your Telegram identity is verified with HMAC-SHA256 on every request. Stakes are validated server-side — the frontend never controls financial logic. All payouts are atomic — a match can only be settled once.</P>
+              <P>If you disconnect mid-game, your opponent wins automatically. If both players disconnect simultaneously, stakes are refunded.</P>
+            </Section>
+
+            <button onPointerDown={() => setScreen(helpFromRef.current)} className="w-full bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white font-black text-xs py-3.5 rounded-xl uppercase tracking-wider shadow-lg">
+              ← Back to Game
+            </button>
+          </main>
         </div>
-
-        {/* How to Play */}
-        <Section title="♟ HOW TO PLAY">
-          <P>Tap any of your pieces to select it. Legal moves appear as dots on the board. Tap a dot to move there. Tap a different piece to switch selection.</P>
-          <P>Capture squares show a ring around the enemy piece. The goal is to checkmate the opponent's king — trap it so it cannot escape.</P>
-        </Section>
-
-        {/* Move Highlighting */}
-        <Section title="🎨 BOARD COLOURS">
-          <Row label="🟨 Yellow / Brown" value="Normal squares" />
-          <Row label="🟩 Green" value="Last move (from → to)" color="#a3e635" />
-          <Row label="🟪 Purple" value="Selected piece" color="#818CF8" />
-          <Row label="🔴 Red" value="King in check" color="#EF4444" />
-          <Row label="⚪ White dot" value="Legal move target" />
-          <Row label="🟢 Green dot" value="Legal move (Easy mode hint)" color="#10B981" />
-        </Section>
-
-        {/* Piece Values */}
-        <Section title="♟ PIECE VALUES">
-          <Row label="♙ Pawn"   value="1 point" />
-          <Row label="♘ Knight" value="3 points" />
-          <Row label="♗ Bishop" value="3 points" />
-          <Row label="♖ Rook"   value="5 points" />
-          <Row label="♕ Queen"  value="9 points" />
-          <Row label="♔ King"   value="∞ — protect at all costs" color="#EF4444" />
-        </Section>
-
-        {/* Currency & Payments */}
-        <Section title="💰 CURRENCIES">
-          {Object.entries(CURRENCY_CONFIG).map(([key, c]) => (
-            <Row key={key} label={`${c.icon} ${key}`} value={c.description.split('—')[0].trim()} color={c.color} />
-          ))}
-          <P style={{ marginTop: 8 }}>All balances are held in a secure escrow on the server. Stakes are locked the moment both players join. You are never charged unless a complete match is played.</P>
-        </Section>
-
-        {/* Prize Structure */}
-        <Section title="🏆 PRIZE STRUCTURE">
-          <P>When you win a match:</P>
-          <Row label="Your stake" value="Returned" color="#10B981" />
-          <Row label="Opponent's stake" value="90% to you" color="#10B981" />
-          <Row label="Platform fee" value="10% rake" color="#6B7280" />
-          <P>On a draw, both players receive their original stake back. No rake is charged on draws.</P>
-        </Section>
-
-        {/* Difficulty */}
-        <Section title="🤖 VS COMPUTER MODES">
-          <Row label="🟢 Easy"   value="Random legal moves — perfect for beginners" />
-          <Row label="🟡 Medium" value="2-ply minimax — plays solid, won't blunder big pieces" />
-          <Row label="🔴 Hard"   value="3-ply minimax + alpha-beta — tactical, punishes mistakes" />
-          <P>Computer moves are computed locally on your device — no internet needed, instant response.</P>
-        </Section>
-
-        {/* Security */}
-        <Section title="🔒 SECURITY">
-          <P>Your Telegram identity is verified with HMAC-SHA256 on every request. Stakes are validated server-side — the frontend never controls financial logic. All payouts are atomic — a match can only be settled once.</P>
-          <P>If you disconnect mid-game, your opponent wins automatically. If both players disconnect simultaneously, stakes are refunded.</P>
-        </Section>
-
-        <button onPointerDown={() => setScreen(helpFromRef.current)}
-          style={{ ...S.btn('linear-gradient(135deg,#6366F1,#8B5CF6)', false), maxWidth: 440 }}>
-          ← Back to Game
-        </button>
       </div>
     )
   }
 
-// ─── QUEUE SCREEN ─────────────────────────────────────────────────────────
-  if (screen === 'queue') return (
-    <div style={{ ...S.page, justifyContent: 'center', minHeight: '100vh' }}>
-      {/* Animated chess piece pulse */}
-      <div style={{ fontSize: 64, animation: 'pulse 1.5s ease-in-out infinite' }}>♟</div>
-      <style>{`@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(0.92)} }`}</style>
+  function renderQueue() {
+    return (
+      <div className="text-white flex justify-center items-center min-h-screen p-0 sm:p-4 bg-[#03010a] font-sans">
+        <div className="w-full max-w-md bg-[#0a0516] h-screen sm:h-[850px] flex flex-col justify-between shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden border-x border-slate-900 sm:rounded-3xl p-5 items-center justify-center space-y-6">
+          <div className="text-6xl animate-pulse">♟</div>
+          <h2 className="font-black text-xl text-purple-400 tracking-wide">Finding Opponent</h2>
+          <p className="text-gray-500 text-xs">
+            {cfg.icon} {cfg.symbol}{stake} {cfg.unit} stake
+          </p>
 
-      <h2 style={{ fontWeight: 900, color: '#818CF8', fontSize: '1.5rem', margin: 0 }}>Finding Opponent</h2>
-      <p style={{ color: '#6B7280', fontSize: '.85rem', margin: 0 }}>
-        {cfg.icon} {cfg.symbol}{stake} {cfg.unit} stake
-      </p>
-
-      {/* Timer */}
-      <div style={{ background: '#111827', border: '1px solid rgba(99,102,241,.3)', borderRadius: 12, padding: '18px 36px', textAlign: 'center' }}>
-        <div style={{ color: '#A5B4FC', fontSize: '2.2rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>
-          {String(Math.floor(queueSeconds / 60)).padStart(2,'0')}:{String(queueSeconds % 60).padStart(2,'0')}
-        </div>
-        <div style={{ color: '#4B5563', fontSize: '.75rem', marginTop: 4 }}>searching...</div>
-      </div>
-
-      <div style={{ color: '#6B7280', fontSize: '.82rem', textAlign: 'center', maxWidth: 280, lineHeight: 1.6 }}>
-        {status || '🔍 Matching you with a player at the same stake...'}
-      </div>
-
-      {/* Prize preview */}
-      <div style={{ display: 'flex', gap: 20, background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 10, padding: '12px 24px' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ color: '#6B7280', fontSize: '.7rem' }}>Pool</div>
-          <div style={{ color: '#A5B4FC', fontWeight: 800 }}>{cfg.symbol}{pool.toFixed(cfg.decimals)}</div>
-        </div>
-        <div style={{ width: 1, background: 'rgba(255,255,255,.06)' }} />
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ color: '#6B7280', fontSize: '.7rem' }}>You Win</div>
-          <div style={{ color: '#10B981', fontWeight: 800 }}>{cfg.symbol}{win.toFixed(cfg.decimals)}</div>
-        </div>
-      </div>
-
-      <button onPointerDown={() => { cancelQueue(); setScreen('home') }}
-        style={{ background: 'transparent', border: '1px solid #374151', color: '#6B7280', padding: '11px 32px', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: '.9rem', WebkitTapHighlightColor: 'transparent' }}>
-        ✕ Cancel Search
-      </button>
-    </div>
-  )
-
-  // ─── LOBBY ────────────────────────────────────────────────────────────────
-  if (screen === 'lobby') return (
-    <div style={S.page}>
-      <div style={{ fontSize: 52 }}>⚔️</div>
-      <h2 style={{ fontWeight: 800, color: '#818CF8', fontSize: '1.4rem', margin: 0 }}>Match Created!</h2>
-      <p style={{ color: '#6B7280', fontSize: '.85rem', margin: 0 }}>Share this ID with your opponent</p>
-      <div style={{ ...S.box, textAlign: 'center' }}>
-        <p style={{ color: '#6B7280', fontSize: '.72rem', fontWeight: 700, letterSpacing: '1px', marginBottom: 10 }}>MATCH ID</p>
-        <div style={{ background: '#0f1f3d', border: '1px solid #1a3a5c', borderRadius: '8px', padding: '12px', fontFamily: 'monospace', fontSize: '.8rem', wordBreak: 'break-all', color: '#A5B4FC', marginBottom: 12 }}>
-          {matchId}
-        </div>
-        <button onPointerDown={() => { navigator.clipboard.writeText(matchId); setStatus('✅ Copied!') }}
-          style={S.btn('linear-gradient(135deg,#3B82F6,#6366F1)', false)}>📋 Copy Match ID</button>
-      </div>
-      <div style={{ color: '#6B7280', fontSize: '.85rem' }}>⏳ Waiting for opponent...</div>
-      {status && <div style={{ color: '#10B981', fontSize: '.85rem' }}>{status}</div>}
-      <button onPointerDown={reset} style={{ background: 'transparent', border: '1px solid #1f2937', color: '#6B7280', padding: '10px 24px', borderRadius: '8px', cursor: 'pointer', fontSize: '.85rem' }}>← Cancel</button>
-    </div>
-  )
-
-  // ─── GAME ─────────────────────────────────────────────────────────────────
-  const boardOri   = isBot ? playerColor : (color === 'black' ? 'black' : 'white')
-  const humanTurn  = isBot
-    ? (!gameOver && !botThinking && chessRef.current.turn() === (playerColor === 'white' ? 'w' : 'b'))
-    : (myTurnUI && !result)
-  const showHints  = isBot && difficulty === 'easy'
-
-  return (
-    <div style={{ ...S.page, padding: '10px 10px 28px', gap: 10 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: 460 }}>
-        <div>
-          <div style={{ fontWeight: 800, color: '#818CF8', fontSize: '.9rem' }}>♟ CHESS ARENA</div>
-          <div style={{ color: '#6B7280', fontSize: '.72rem' }}>
-            {isBot
-              ? <>You play <strong style={{ color: '#A5B4FC' }}>{playerColor}</strong> · {difficulty}</>
-              : <>You are <strong style={{ color: '#A5B4FC' }}>{color}</strong> · ${stake} stake</>
-            }
+          <div className="bg-[#111827] border border-indigo-500/30 rounded-xl py-4 px-8 text-center shadow-lg">
+            <div className="text-indigo-300 text-3xl font-black tabular-nums">
+              {String(Math.floor(queueSeconds / 60)).padStart(2,'0')}:{String(queueSeconds % 60).padStart(2,'0')}
+            </div>
+            <div className="text-gray-600 text-[10px] uppercase font-bold tracking-wider mt-1">searching...</div>
           </div>
-        </div>
-        <div style={{
-          background: botThinking ? 'rgba(245,158,11,.12)' : humanTurn ? 'rgba(16,185,129,.12)' : 'rgba(99,102,241,.12)',
-          border: `1px solid ${botThinking ? 'rgba(245,158,11,.4)' : humanTurn ? 'rgba(16,185,129,.4)' : 'rgba(99,102,241,.4)'}`,
-          borderRadius: 8, padding: '5px 12px', fontSize: '.75rem', fontWeight: 700,
-          color: botThinking ? '#F59E0B' : humanTurn ? '#10B981' : '#A5B4FC'
-        }}>
-          {botThinking ? '🤖 Thinking' : humanTurn ? '⚡️ Your turn' : '⏳ Waiting'}
-        </div>
-      </div>
 
-      {/* Status */}
-      <div style={{
-        background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.2)',
-        borderRadius: 10, padding: '9px 16px', fontSize: '.85rem', fontWeight: 600,
-        textAlign: 'center', width: '100%', maxWidth: 460, color: '#A5B4FC', boxSizing: 'border-box'
-      }}>
-        {status || '♟ Game in progress'}
-      </div>
-
-      {/* Custom board */}
-      <div style={{ width: 'min(460px, calc(100vw - 20px))' }}>
-        <ChessBoard
-          chess={chessRef.current}
-          orientation={boardOri}
-          selectedSq={humanTurn ? selectedSq : null}
-          legalTargets={humanTurn ? legalTargets : []}
-          onSquareTap={isBot ? handleSquareTap : handleMultiSquareTap}
-          showHints={showHints}
-          lastMove={lastMove}
-          checkedKingSq={checkedKingSq}
-        />
-      </div>
-
-      {/* Easy mode hint label */}
-      {showHints && humanTurn && !gameOver && (
-        <div style={{ color: '#10B981', fontSize: '.72rem', textAlign: 'center', opacity: 0.85 }}>
-          💡 Tap any piece to see where it can move
-        </div>
-      )}
-
-      {/* Move history */}
-      {isBot && moveHistory.length > 0 && (
-        <div style={{ ...S.box, maxHeight: 68, overflowY: 'auto', padding: '10px 14px' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            {moveHistory.map((m, i) => (
-              <span key={i} style={{
-                background: i % 2 === 0 ? 'rgba(255,255,255,.06)' : 'rgba(99,102,241,.12)',
-                color: i % 2 === 0 ? '#9CA3AF' : '#A5B4FC',
-                padding: '2px 7px', borderRadius: 4, fontSize: '.72rem', fontWeight: 600
-              }}>
-                {i % 2 === 0 ? `${Math.floor(i/2)+1}.` : ''}{m}
-              </span>
-            ))}
+          <div className="text-gray-400 text-xs text-center max-w-[260px] leading-relaxed">
+            {status || '🔍 Matching you with a player at the same stake...'}
           </div>
-        </div>
-      )}
 
-      {/* Prize bar */}
-      {!isBot && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: 460, background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 12, padding: '10px 16px', boxSizing: 'border-box' }}>
-          <div>
-            <div style={{ color: '#6B7280', fontSize: '.7rem' }}>Prize Pool</div>
-          <div style={{ color: '#10B981', fontWeight: 800 }}>{cfg.symbol}{pool.toFixed(cfg.decimals)} {cfg.unit}</div>
+          <div className="flex gap-5 bg-[#111827] border border-white/5 rounded-xl py-3 px-6 shadow-inner">
+            <div className="text-center">
+              <div className="text-gray-500 text-[10px]">Pool</div>
+              <div className="text-indigo-300 font-bold">{cfg.symbol}{pool.toFixed(cfg.decimals)}</div>
+            </div>
+            <div className="w-px bg-white/5" />
+            <div className="text-center">
+              <div className="text-gray-500 text-[10px]">You Win</div>
+              <div className="text-emerald-400 font-bold">{cfg.symbol}{win.toFixed(cfg.decimals)}</div>
+            </div>
           </div>
-          <div style={{ width: 1, background: 'rgba(255,255,255,.06)' }} />
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ color: '#6B7280', fontSize: '.7rem' }}>Winner Gets</div>
-            <div style={{ color: '#A5B4FC', fontWeight: 800 }}>{cfg.symbol}{win.toFixed(cfg.decimals)} {cfg.unit}</div>
-          </div>
-        </div>
-      )}
 
-      {/* Buttons */}
-      <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 460 }}>
-        {(result || gameOver) && (
-          <button onPointerDown={isBot ? startVsComputer : reset}
-            style={{ ...S.btn('linear-gradient(135deg,#6366F1,#8B5CF6)', false), flex: 1 }}>
-            🔄 Play Again
+          <button 
+            onPointerDown={() => { cancelQueue(); setScreen('home') }}
+            className="bg-transparent border border-gray-800 text-gray-500 hover:text-white px-8 py-3 rounded-xl font-bold text-sm tracking-wider transition"
+          >
+            ✕ Cancel Search
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  function renderLobby() {
+    return (
+      <div className="text-white flex justify-center items-center min-h-screen p-0 sm:p-4 bg-[#03010a] font-sans">
+        <div className="w-full max-w-md bg-[#0a0516] h-screen sm:h-[850px] flex flex-col justify-between shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden border-x border-slate-900 sm:rounded-3xl p-5 items-center justify-center space-y-6">
+          <div className="text-5xl">⚔️</div>
+          <h2 className="font-black text-xl text-purple-400 tracking-wide">Match Created!</h2>
+          <p className="text-gray-500 text-xs">Share this ID with your opponent</p>
+
+          <div className="bg-[#111827] border border-white/5 rounded-xl p-4 w-full text-center space-y-2">
+            <p className="text-gray-500 text-[10px] uppercase font-bold tracking-wider">Match ID</p>
+            <div className="bg-[#0f1f3d] border border-[#1a3a5c] rounded-lg p-3 font-mono text-xs text-indigo-300 word-break-all select-all">
+              {matchId}
+            </div>
+            <button 
+              onPointerDown={() => { navigator.clipboard.writeText(matchId); setStatus('✅ Copied!') }}
+              className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold text-xs py-3 rounded-lg mt-2 shadow-md uppercase tracking-wider"
+            >
+              📋 Copy Match ID
+            </button>
+          </div>
+
+          <div className="text-gray-400 text-xs animate-pulse">⏳ Waiting for opponent...</div>
+          {status && <div className="text-emerald-400 text-xs font-semibold">{status}</div>}
+
+          <button 
+            onPointerDown={reset} 
+            className="bg-transparent border border-gray-800 text-gray-500 hover:text-white px-8 py-3 rounded-xl font-bold text-xs tracking-wider transition uppercase"
+          >
+            ← Cancel
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  function renderGame() {
+    const boardOri   = isBot ? playerColor : (color === 'black' ? 'black' : 'white')
+    const humanTurn  = isBot
+      ? (!gameOver && !botThinking && chessRef.current.turn() === (playerColor === 'white' ? 'w' : 'b'))
+      : (myTurnUI && !result)
+    const showHints  = isBot && difficulty === 'easy'
+
+    return (
+      <div className="text-white flex justify-center items-center min-h-screen p-0 sm:p-4 bg-[#03010a] font-sans">
+        <div className="w-full max-w-md bg-[#0a0516] h-screen sm:h-[850px] flex flex-col justify-between shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden border-x border-slate-900 sm:rounded-3xl p-3.5 space-y-3.5">
+          {/* Header */}
+          <div className="flex justify-between items-center w-full">
+            <div>
+              <div className="font-black text-sm text-purple-400 tracking-wide">♟ CHESS ARENA</div>
+              <div className="text-gray-500 text-[10px]">
+                {isBot
+                  ? <>You play <strong className="text-indigo-300">{playerColor}</strong> · {difficulty}</>
+                  : <>You are <strong className="text-indigo-300">{color}</strong> · {cfg.symbol}{stake} stake</>
+                }
+              </div>
+            </div>
+            <div className={`border rounded-lg px-3 py-1 text-[11px] font-black uppercase shadow-sm ${
+              botThinking 
+                ? 'bg-amber-500/10 border-amber-500/40 text-amber-400' 
+                : humanTurn 
+                ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400' 
+                : 'bg-indigo-500/10 border-indigo-500/40 text-indigo-400'
+            }`}>
+              {botThinking ? '🤖 Thinking' : humanTurn ? '⚡️ Your turn' : '⏳ Waiting'}
+            </div>
+          </div>
+
+          {/* Status Bar */}
+          <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl py-2.5 px-4 text-center text-xs font-semibold text-indigo-300 w-full shadow-inner">
+            {status || '♟ Game in progress'}
+          </div>
+
+          {/* Custom Chessboard Container */}
+          <div className="w-full flex justify-center">
+            <div className="w-full max-w-[390px] aspect-square">
+              <ChessBoard
+                chess={chessRef.current}
+                orientation={boardOri}
+                selectedSq={humanTurn ? selectedSq : null}
+                legalTargets={humanTurn ? legalTargets : []}
+                onSquareTap={isBot ? handleSquareTap : handleMultiSquareTap}
+                showHints={showHints}
+                lastMove={lastMove}
+                checkedKingSq={checkedKingSq}
+              />
+            </div>
+          </div>
+
+          {/* Easy mode hints */}
+          {showHints && humanTurn && !gameOver && (
+            <div className="text-emerald-400 text-[10px] text-center font-bold tracking-wide animate-pulse">
+              💡 Tap any piece to see where it can move
+            </div>
+          )}
+
+          {/* Move History */}
+          {isBot && moveHistory.length > 0 && (
+            <div className="bg-[#111827] border border-white/5 rounded-xl p-2.5 max-h-[70px] overflow-y-auto no-scrollbar w-full shadow-inner">
+              <div className="flex flex-wrap gap-1.5">
+                {moveHistory.map((m, i) => (
+                  <span key={i} className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    i % 2 === 0 ? 'bg-white/5 text-gray-400' : 'bg-indigo-500/10 text-indigo-300'
+                  }`}>
+                    {i % 2 === 0 ? `${Math.floor(i/2)+1}.` : ''}{m}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Prize pool summary */}
+          {!isBot && (
+            <div className="flex justify-between items-center w-full bg-[#111827] border border-white/5 rounded-xl py-2 px-4 shadow-inner text-xs">
+              <div>
+                <div className="text-gray-500 text-[9px]">Prize Pool</div>
+                <div className="text-emerald-400 font-bold">{cfg.symbol}{pool.toFixed(cfg.decimals)} {cfg.unit}</div>
+              </div>
+              <div className="w-px h-6 bg-white/5" />
+              <div className="text-right">
+                <div className="text-gray-500 text-[9px]">Winner Gets</div>
+                <div className="text-indigo-300 font-bold">{cfg.symbol}{win.toFixed(cfg.decimals)} {cfg.unit}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Control Buttons */}
+          <div className="flex gap-2.5 w-full">
+            {(result || gameOver) && (
+              <button 
+                onPointerDown={isBot ? startVsComputer : reset}
+                className="flex-1 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white font-black text-xs py-3.5 rounded-xl uppercase tracking-wider shadow-lg transition"
+              >
+                🔄 Play Again
+              </button>
+            )}
+            <button 
+              onPointerDown={reset}
+              className={`py-3.5 rounded-xl font-black text-xs tracking-wider transition uppercase border border-gray-800 text-gray-500 hover:text-white ${
+                result || gameOver ? 'px-5' : 'flex-grow'
+              }`}
+            >
+              ← Home
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ─── CONSOLIDATED RENDER ───────────────────────────────────────────────────
+  return (
+    <div className="text-white flex justify-center items-center min-h-screen p-0 sm:p-4 bg-[#03010a] font-sans">
+      <div className="w-full max-w-md bg-[#0a0516] h-screen sm:h-[850px] flex flex-col justify-between shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden border-x border-slate-900 sm:rounded-3xl">
+        
+        {/* Render header (present on home screen) */}
+        {screen === 'home' && (
+          <header className="px-4 pt-3 pb-2 bg-[#0e071f] flex justify-between items-center border-b border-[#1b1233] shrink-0 z-50">
+            <button onPointerDown={reset} className="text-gray-400 hover:text-white transition">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="flex items-center gap-1.5 cursor-pointer" onPointerDown={() => setScreen('home')}>
+              <span className="font-bold text-base tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-purple-300">ChessGame</span>
+              <span className="text-lg drop-shadow-[0_0_6px_rgba(168,85,247,0.6)]">♟️</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            </div>
+            <button onPointerDown={() => { helpFromRef.current = screen; setScreen('help') }} className="text-gray-400 hover:text-white transition">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
+            </button>
+          </header>
         )}
-        <button onPointerDown={reset}
-          style={{ flex: result || gameOver ? '0 0 auto' : 1, padding: '13px 20px', background: 'transparent', border: '1px solid #1f2937', color: '#6B7280', borderRadius: '10px', cursor: 'pointer', fontWeight: 700, fontSize: '.85rem', WebkitTapHighlightColor: 'transparent' }}>
-          ← Home
-        </button>
+
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col justify-between">
+          {screen === 'home' && renderHome()}
+          {screen === 'profile' && <ProfileScreen onBack={() => setScreen('home')} />}
+          {screen === 'help' && renderHelp()}
+          {screen === 'queue' && renderQueue()}
+          {screen === 'lobby' && renderLobby()}
+          {screen === 'game' && renderGame()}
+        </div>
+
+        {/* Render footer (present on home and profile screens) */}
+        {(screen === 'home' || screen === 'profile') && (
+          <footer className="bg-[#0b0617] border-t border-[#231545] grid grid-cols-5 text-center py-3 text-gray-300 text-xs font-black shrink-0 z-40 shadow-[0_-8px_25px_rgba(139,92,246,0.15)]">
+            <button onPointerDown={() => setScreen('home')} className={`${screen === 'home' ? 'text-purple-200 drop-shadow-[0_0_12px_rgba(168,85,247,0.75)]' : 'hover:text-gray-150 transition duration-100'} flex flex-col items-center justify-center gap-1`}>
+              <span className="text-lg">🏠</span> 
+              <span>Home</span>
+            </button>
+            <button onPointerDown={() => alert('Leaderboard is displayed below on the home page.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-150">
+              <span className="text-lg">🏆</span>
+              <span>Rank</span>
+            </button>
+            <button onPointerDown={() => { setScreen('profile') }} className={`${screen === 'profile' ? 'text-purple-200 drop-shadow-[0_0_12px_rgba(168,85,247,0.75)]' : 'hover:text-gray-150 transition duration-100'} flex flex-col items-center justify-center gap-1`}>
+              <span className="text-lg">📜</span>
+              <span>History</span>
+            </button>
+            <button onPointerDown={() => alert('Support Chat coming soon.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100">
+              <span className="text-lg">💬</span>
+              <span>Chat</span>
+            </button>
+            <button onPointerDown={() => setScreen('profile')} className={`hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100`}>
+              <span className="text-lg">👤</span>
+              <span>Me</span>
+            </button>
+          </footer>
+        )}
       </div>
     </div>
   )

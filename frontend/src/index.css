@@ -1,10 +1,30 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700;800;900&display=swap');
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-  background: #1a1a2e;
+  font-family: 'Inter', sans-serif;
+  background-color: #03010a;
   color: #eaeaea;
-  font-family: 'Segoe UI', system-ui, sans-serif;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.bet-panel-transition {
+  transition: max-height 0.3s ease-in-out, opacity 0.2s ease-in-out, margin 0.3s ease-in-out;
+}
+.bet-panel-hidden {
+  max-height: 0 !important;
+  opacity: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  overflow: hidden;
+  border-color: transparent;
 }
