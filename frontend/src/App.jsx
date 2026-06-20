@@ -289,6 +289,8 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
       borderRadius: 6,
       overflow: 'hidden',
       boxShadow: '0 8px 32px rgba(0,0,0,.7)',
+      border: '3px solid #6B3A1F',
+      borderRadius: 4,
       userSelect: 'none',
       WebkitUserSelect: 'none',
       touchAction: 'manipulation'
@@ -308,11 +310,11 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
           const isCheckedKing = sq === checkedKingSq
           const hasPiece = !!piece
 
-          // Square background — priority: selected > check > last move > normal
-          let bg = isLight ? '#FCD34D' : '#B45309'
-          if (isSelected)              bg = '#6366F1'
-          else if (isCheckedKing)      bg = '#EF4444'
-          else if (isLastFrom || isLastTo) bg = isLight ? '#a3e635' : '#65a30d'
+         // Classic wooden board colours (chess.com style)
+          let bg = isLight ? '#F0D9B5' : '#B58863'
+          if (isSelected)                  bg = '#7B61FF'
+          else if (isCheckedKing)          bg = '#EF4444'
+          else if (isLastFrom || isLastTo) bg = isLight ? '#CDD16F' : '#AABA35'
 
           return (
             <div
@@ -379,12 +381,12 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
 
               {/* Rank/File labels on edge squares */}
               {file === displayFiles[0] && (
-                <span style={{ position: 'absolute', top: 2, left: 3, fontSize: 9, fontWeight: 700, color: isLight ? '#B45309' : '#FCD34D', opacity: 0.7, lineHeight: 1 }}>
+                <span style={{ position: 'absolute', top: 2, left: 3, fontSize: 9, fontWeight: 700, color: isLight ? '#B58863' : '#F0D9B5', opacity: 0.8, lineHeight: 1 }}>
                   {rank}
                 </span>
               )}
               {rank === displayRanks[7] && (
-                <span style={{ position: 'absolute', bottom: 2, right: 3, fontSize: 9, fontWeight: 700, color: isLight ? '#B45309' : '#FCD34D', opacity: 0.7, lineHeight: 1 }}>
+                <span style={{ position: 'absolute', bottom: 2, right: 3, fontSize: 9, fontWeight: 700, color: isLight ? '#B58863' : '#F0D9B5', opacity: 0.8, lineHeight: 1 }}>
                   {file}
                 </span>
               )}
@@ -408,128 +410,6 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
     prev.showHints             === next.showHints
   )
 })
-/*// ─── CUSTOM CHESS BOARD ───────────────────────────────────────────────────────
-const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap, showHints, lastMove, checkedKingSq }) {
-  const files = ['a','b','c','d','e','f','g','h']
-  const ranks = ['8','7','6','5','4','3','2','1']
-
-  // flip for black orientation
-  const displayFiles = orientation === 'black' ? [...files].reverse() : files
-  const displayRanks = orientation === 'black' ? [...ranks].reverse() : ranks
-
-  return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(8, 1fr)',
-      width: '100%',
-      aspectRatio: '1 / 1',
-      borderRadius: 6,
-      overflow: 'hidden',
-      boxShadow: '0 8px 32px rgba(0,0,0,.7)',
-      userSelect: 'none',
-      WebkitUserSelect: 'none',
-      touchAction: 'manipulation'
-    }}>
-      {displayRanks.map(rank =>
-        displayFiles.map(file => {
-          const sq = file + rank
-          const fileIdx = files.indexOf(file)
-          const rankIdx = ranks.indexOf(rank)
-          const isLight = (fileIdx + rankIdx) % 2 === 0
-          const piece = chess.get(sq)
-          const pieceKey = piece ? piece.color + piece.type.toUpperCase() : null
-          const isSelected = sq === selectedSq
-          const isLegal = legalTargets.includes(sq)
-          const isLastFrom = lastMove && lastMove.from === sq
-          const isLastTo   = lastMove && lastMove.to === sq
-          const hasPiece = !!piece
-
-          // Square background
-          const isCheckedKing = sq === checkedKingSq
-          let bg = isLight ? '#FCD34D' : '#B45309'
-          if (isSelected)           bg = '#6366F1'
-          else if (isCheckedKing)   bg = '#EF4444'                          // red — king in check
-          else if (isLastFrom || isLastTo) bg = isLight ? '#a3e635' : '#65a30d'
-
-          return (
-            <div
-              key={sq}
-              onPointerDown={(e) => {
-                e.preventDefault()
-                onSquareTap(sq)
-              }}
-              style={{
-                position: 'relative',
-                background: bg,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              {/* Legal move indicator }
-              {isLegal && (
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  pointerEvents: 'none',
-                  zIndex: 2
-                }}>
-                  {hasPiece ? (
-                    // Capture ring
-                    <div style={{
-                      width: '90%', height: '90%',
-                      borderRadius: '50%',
-                      border: showHints ? '4px solid rgba(16,185,129,0.85)' : '3px solid rgba(255,255,255,0.4)',
-                      boxSizing: 'border-box'
-                    }} />
-                  ) : (
-                    // Move dot
-                    <div style={{
-                      width: showHints ? '44%' : '30%',
-                      height: showHints ? '44%' : '30%',
-                      borderRadius: '50%',
-                      background: showHints ? 'rgba(16,185,129,0.8)' : 'rgba(255,255,255,0.35)'
-                    }} />
-                  )}
-                </div>
-              )}
-
-              {/* Piece }
-              {pieceKey && (
-                <span style={{
-                  fontSize: 'clamp(20px, 6vw, 42px)',
-                  lineHeight: 1,
-                  zIndex: 3,
-                  filter: isSelected ? 'brightness(1.4) drop-shadow(0 0 6px rgba(255,255,255,0.8))' : 'drop-shadow(1px 1px 1px rgba(0,0,0,0.5))',
-                  transition: 'filter 0.1s'
-                }}>
-                  {PIECES[pieceKey]}
-                </span>
-              )}
-
-              {/* Rank/File labels on edge squares }
-              {file === displayFiles[0] && (
-                <span style={{ position: 'absolute', top: 2, left: 3, fontSize: 9, fontWeight: 700, color: isLight ? '#B45309' : '#FCD34D', opacity: 0.7, lineHeight: 1 }}>
-                  {rank}
-                </span>
-              )}
-              {rank === displayRanks[7] && (
-                <span style={{ position: 'absolute', bottom: 2, right: 3, fontSize: 9, fontWeight: 700, color: isLight ? '#B45309' : '#FCD34D', opacity: 0.7, lineHeight: 1 }}>
-                  {file}
-                </span>
-              )}
-            </div>
-          )
-        })
-      )}
-    </div>
-  )
-}*/
 
 // ─── PROFILE SCREEN ───────────────────────────────────────────────────────────
 function ProfileScreen({ onBack }) {
@@ -1201,24 +1081,54 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         <button onPointerDown={() => setMode('human')}    style={S.modeBtn(mode === 'human')}>⚔️ vs Human</button>
       </div>
 
-      {mode === 'computer' && (
-        <div style={S.box}>
+    {mode === 'computer' && (
+        <div style={{ ...S.box, width: '100%', maxWidth: 440 }}>
+
+          <div style={{ background: 'linear-gradient(135deg,#1a1f2e,#111827)', borderRadius: 12, padding: '16px', marginBottom: 16, border: '1px solid rgba(99,102,241,.15)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8,1fr)', width: '100%', aspectRatio: '1/1', borderRadius: 8, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,.6)', border: '2px solid #6B3A1F' }}>
+              {['8','7','6','5','4','3','2','1'].map(rank =>
+                ['a','b','c','d','e','f','g','h'].map(file => {
+                  const isLight = (file.charCodeAt(0) + parseInt(rank)) % 2 === 0
+                  const previewMap = {
+                    a8:'♜',b8:'♞',c8:'♝',d8:'♛',e8:'♚',f8:'♝',g8:'♞',h8:'♜',
+                    a7:'♟',b7:'♟',c7:'♟',d7:'♟',e7:'♟',f7:'♟',g7:'♟',h7:'♟',
+                    a2:'♙',b2:'♙',c2:'♙',d2:'♙',e2:'♙',f2:'♙',g2:'♙',h2:'♙',
+                    a1:'♖',b1:'♘',c1:'♗',d1:'♕',e1:'♔',f1:'♗',g1:'♘',h1:'♖',
+                  }
+                  return (
+                    <div key={file+rank} style={{
+                      background: isLight ? '#F0D9B5' : '#B58863',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 'clamp(8px,3.5vw,22px)', lineHeight: 1,
+                      textShadow: '0 1px 2px rgba(0,0,0,.4)'
+                    }}>
+                      {previewMap[file+rank] || ''}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+
           <p style={{ color: '#6B7280', fontSize: '.72rem', fontWeight: 700, letterSpacing: '1px', marginBottom: 10 }}>PLAY AS</p>
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            <button onPointerDown={() => setPlayerColor('white')} style={S.diffBtn(playerColor === 'white', '#F9FAFB')}>♙ White</button>
-            <button onPointerDown={() => setPlayerColor('black')} style={S.diffBtn(playerColor === 'black', '#818CF8')}>♟ Black</button>
+            <button onPointerDown={() => setPlayerColor('white')} style={{ ...S.diffBtn(playerColor === 'white', '#F9FAFB'), padding: '13px 6px', fontSize: '.88rem' }}>♙ White</button>
+            <button onPointerDown={() => setPlayerColor('black')} style={{ ...S.diffBtn(playerColor === 'black', '#818CF8'), padding: '13px 6px', fontSize: '.88rem' }}>♟ Black</button>
           </div>
+
           <p style={{ color: '#6B7280', fontSize: '.72rem', fontWeight: 700, letterSpacing: '1px', marginBottom: 10 }}>DIFFICULTY</p>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
             <button onPointerDown={() => setDifficulty('easy')}   style={S.diffBtn(difficulty === 'easy',   '#10B981')}>🟢 Easy</button>
             <button onPointerDown={() => setDifficulty('medium')} style={S.diffBtn(difficulty === 'medium', '#F59E0B')}>🟡 Medium</button>
             <button onPointerDown={() => setDifficulty('hard')}   style={S.diffBtn(difficulty === 'hard',   '#EF4444')}>🔴 Hard</button>
           </div>
-          {difficulty === 'easy' && (
-            <p style={{ color: '#10B981', fontSize: '.7rem', margin: '8px 0 14px' }}>
-              💡 Easy shows all possible moves when you tap a piece
-            </p>
-          )}
+
+          <div style={{ background: '#0d1117', borderRadius: 8, padding: '10px 14px', marginBottom: 16, minHeight: 38 }}>
+            {difficulty === 'easy'   && <p style={{ color: '#10B981', fontSize: '.75rem', margin: 0 }}>💡 Random moves — legal move hints shown on every piece</p>}
+            {difficulty === 'medium' && <p style={{ color: '#F59E0B', fontSize: '.75rem', margin: 0 }}>⚙️ 2-ply minimax — solid play, won't blunder big pieces</p>}
+            {difficulty === 'hard'   && <p style={{ color: '#EF4444', fontSize: '.75rem', margin: 0 }}>🔥 3-ply + alpha-beta — tactical, punishes mistakes</p>}
+          </div>
+
           <button onPointerDown={startVsComputer} style={S.btn('linear-gradient(135deg,#6366F1,#8B5CF6)', false)}>
             🤖 Play vs Computer
           </button>
