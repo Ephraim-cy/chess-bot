@@ -1475,153 +1475,147 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
     )
 
     return (
-      <div className="text-white flex justify-center items-center min-h-screen p-0 sm:p-4 bg-[#03010a] font-sans">
-        <div className="w-full max-w-md bg-[#0a0516] h-screen sm:h-[850px] flex flex-col justify-between shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden border-x border-slate-900 sm:rounded-3xl">
-          {/* Header */}
-          <header className="px-4 pt-3 pb-2 bg-[#0e071f] flex justify-between items-center border-b border-[#1b1233] shrink-0 z-50">
-            <button onPointerDown={() => setScreen(helpFromRef.current)} className="text-gray-400 hover:text-white transition">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-            </button>
-            <div className="font-bold text-base tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-purple-300">Help & Rules</div>
-            <div className="w-6" />
-          </header>
+      <div className="flex-1 flex flex-col justify-between h-full bg-[#080B14]">
+        {/* Header */}
+        <header className="px-4 pt-3 pb-2 bg-[#0e071f] flex justify-between items-center border-b border-[#1b1233] shrink-0 z-50">
+          <button onPointerDown={() => setScreen(helpFromRef.current)} className="text-gray-400 hover:text-white transition">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+          </button>
+          <div className="font-bold text-base tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-purple-300">Help & Rules</div>
+          <div className="w-6" />
+        </header>
 
-          {/* Scrollable content */}
-          <main className="p-3 space-y-4 flex-grow overflow-y-auto no-scrollbar pb-8 bg-[#080B14]">
-            <Section title="♟ HOW TO PLAY">
-              <P>Tap any of your pieces to select it. Legal moves appear as dots on the board. Tap a dot to move there. Tap a different piece to switch selection.</P>
-              <P>Capture squares show a ring around the enemy piece. The goal is to checkmate the opponent's king — trap it so it cannot escape.</P>
-            </Section>
+        {/* Scrollable content */}
+        <main className="p-3 space-y-4 flex-grow overflow-y-auto no-scrollbar pb-8">
+          <Section title="♟ HOW TO PLAY">
+            <P>Tap any of your pieces to select it. Legal moves appear as dots on the board. Tap a dot to move there. Tap a different piece to switch selection.</P>
+            <P>Capture squares show a ring around the enemy piece. The goal is to checkmate the opponent's king — trap it so it cannot escape.</P>
+          </Section>
 
-            <Section title="🎨 BOARD COLOURS">
-              <Row label="🟨 Yellow / Brown" value="Normal squares" />
-              <Row label="🟩 Green" value="Last move (from → to)" colorClass="text-lime-400" />
-              <Row label="🟪 Purple" value="Selected piece" colorClass="text-indigo-400" />
-              <Row label="🔴 Red" value="King in check" colorClass="text-rose-500" />
-              <Row label="⚪ White dot" value="Legal move target" />
-              <Row label="🟢 Green dot" value="Legal move (Easy mode hint)" colorClass="text-emerald-400" />
-            </Section>
+          <Section title="🎨 BOARD COLOURS">
+            <Row label="🟨 Yellow / Brown" value="Normal squares" />
+            <Row label="🟩 Green" value="Last move (from → to)" colorClass="text-lime-400" />
+            <Row label="🟪 Purple" value="Selected piece" colorClass="text-indigo-400" />
+            <Row label="🔴 Red" value="King in check" colorClass="text-rose-500" />
+            <Row label="⚪ White dot" value="Legal move target" />
+            <Row label="🟢 Green dot" value="Legal move (Easy mode hint)" colorClass="text-emerald-400" />
+          </Section>
 
-            <Section title="♟ PIECE VALUES">
-              <Row label="♙ Pawn"   value="1 point" />
-              <Row label="♘ Knight" value="3 points" />
-              <Row label="♗ Bishop" value="3 points" />
-              <Row label="♖ Rook"   value="5 points" />
-              <Row label="♕ Queen"  value="9 points" />
-              <Row label="♔ King"   value="∞ — protect at all costs" colorClass="text-rose-500" />
-            </Section>
+          <Section title="♟ PIECE VALUES">
+            <Row label="♙ Pawn"   value="1 point" />
+            <Row label="♘ Knight" value="3 points" />
+            <Row label="♗ Bishop" value="3 points" />
+            <Row label="♖ Rook"   value="5 points" />
+            <Row label="♕ Queen"  value="9 points" />
+            <Row label="♔ King"   value="∞ — protect at all costs" colorClass="text-rose-500" />
+          </Section>
 
-            <Section title="💰 CURRENCIES">
-              {Object.entries(CURRENCY_CONFIG).map(([key, c]) => (
-                <Row key={key} label={`${c.icon} ${key}`} value={c.description.split('—')[0].trim()} colorClass="text-indigo-300" />
-              ))}
-              <P className="mt-2">All balances are held in a secure escrow on the server. Stakes are locked the moment both players join. You are never charged unless a complete match is played.</P>
-            </Section>
+          <Section title="💰 CURRENCIES">
+            {Object.entries(CURRENCY_CONFIG).map(([key, c]) => (
+              <Row key={key} label={`${c.icon} ${key}`} value={c.description.split('—')[0].trim()} colorClass="text-indigo-300" />
+            ))}
+            <P className="mt-2">All balances are held in a secure escrow on the server. Stakes are locked the moment both players join. You are never charged unless a complete match is played.</P>
+          </Section>
 
-            <Section title="🏆 PRIZE STRUCTURE">
-              <P>When you win a match:</P>
-              <Row label="Your stake" value="Returned" colorClass="text-emerald-400" />
-              <Row label="Opponent's stake" value="90% to you" colorClass="text-emerald-400" />
-              <Row label="Platform fee" value="10% rake" colorClass="text-gray-500" />
-              <P>On a draw, both players receive their original stake back. No rake is charged on draws.</P>
-            </Section>
+          <Section title="🏆 PRIZE STRUCTURE">
+            <P>When you win a match:</P>
+            <Row label="Your stake" value="Returned" colorClass="text-emerald-400" />
+            <Row label="Opponent's stake" value="90% to you" colorClass="text-emerald-400" />
+            <Row label="Platform fee" value="10% rake" colorClass="text-gray-500" />
+            <P>On a draw, both players receive their original stake back. No rake is charged on draws.</P>
+          </Section>
 
-            <Section title="🤖 VS COMPUTER MODES">
-              <Row label="🟢 Easy"   value="Random legal moves — perfect for beginners" />
-              <Row label="🟡 Medium" value="2-ply minimax — plays solid, won't blunder big pieces" />
-              <Row label="🔴 Hard"   value="3-ply minimax + alpha-beta — tactical, punishes mistakes" />
-              <P>Computer moves are computed locally on your device — no internet needed, instant response.</P>
-            </Section>
+          <Section title="🤖 VS COMPUTER MODES">
+            <Row label="🟢 Easy"   value="Random legal moves — perfect for beginners" />
+            <Row label="🟡 Medium" value="2-ply minimax — plays solid, won't blunder big pieces" />
+            <Row label="🔴 Hard"   value="3-ply minimax + alpha-beta — tactical, punishes mistakes" />
+            <P>Computer moves are computed locally on your device — no internet needed, instant response.</P>
+          </Section>
 
-            <Section title="🔒 SECURITY">
-              <P>Your Telegram identity is verified with HMAC-SHA256 on every request. Stakes are validated server-side — the frontend never controls financial logic. All payouts are atomic — a match can only be settled once.</P>
-              <P>If you disconnect mid-game, your opponent wins automatically. If both players disconnect simultaneously, stakes are refunded.</P>
-            </Section>
+          <Section title="🔒 SECURITY">
+            <P>Your Telegram identity is verified with HMAC-SHA256 on every request. Stakes are validated server-side — the frontend never controls financial logic. All payouts are atomic — a match can only be settled once.</P>
+            <P>If you disconnect mid-game, your opponent wins automatically. If both players disconnect simultaneously, stakes are refunded.</P>
+          </Section>
 
-            <button onPointerDown={() => setScreen(helpFromRef.current)} className="w-full bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white font-black text-xs py-3.5 rounded-xl uppercase tracking-wider shadow-lg">
-              ← Back to Game
-            </button>
-          </main>
-        </div>
+          <button onPointerDown={() => setScreen(helpFromRef.current)} className="w-full bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white font-black text-xs py-3.5 rounded-xl uppercase tracking-wider shadow-lg">
+            ← Back to Game
+          </button>
+        </main>
       </div>
     )
   }
 
   function renderQueue() {
     return (
-      <div className="text-white flex justify-center items-center min-h-screen p-0 sm:p-4 bg-[#03010a] font-sans">
-        <div className="w-full max-w-md bg-[#0a0516] h-screen sm:h-[850px] flex flex-col justify-between shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden border-x border-slate-900 sm:rounded-3xl p-5 items-center justify-center space-y-6">
-          <div className="text-6xl animate-pulse">♟</div>
-          <h2 className="font-black text-xl text-purple-400 tracking-wide">Finding Opponent</h2>
-          <p className="text-gray-500 text-xs">
-            {cfg.icon} {cfg.symbol}{stake} {cfg.unit} stake
-          </p>
+      <div className="flex-1 flex flex-col items-center justify-center p-5 space-y-6 h-full bg-[#0a0516]">
+        <div className="text-6xl animate-pulse">♟</div>
+        <h2 className="font-black text-xl text-purple-400 tracking-wide">Finding Opponent</h2>
+        <p className="text-gray-500 text-xs">
+          {cfg.icon} {cfg.symbol}{stake} {cfg.unit} stake
+        </p>
 
-          <div className="bg-[#111827] border border-indigo-500/30 rounded-xl py-4 px-8 text-center shadow-lg">
-            <div className="text-indigo-300 text-3xl font-black tabular-nums">
-              {String(Math.floor(queueSeconds / 60)).padStart(2,'0')}:{String(queueSeconds % 60).padStart(2,'0')}
-            </div>
-            <div className="text-gray-600 text-[10px] uppercase font-bold tracking-wider mt-1">searching...</div>
+        <div className="bg-[#111827] border border-indigo-500/30 rounded-xl py-4 px-8 text-center shadow-lg">
+          <div className="text-indigo-300 text-3xl font-black tabular-nums">
+            {String(Math.floor(queueSeconds / 60)).padStart(2,'0')}:{String(queueSeconds % 60).padStart(2,'0')}
           </div>
-
-          <div className="text-gray-400 text-xs text-center max-w-[260px] leading-relaxed">
-            {status || '🔍 Matching you with a player at the same stake...'}
-          </div>
-
-          <div className="flex gap-5 bg-[#111827] border border-white/5 rounded-xl py-3 px-6 shadow-inner">
-            <div className="text-center">
-              <div className="text-gray-500 text-[10px]">Pool</div>
-              <div className="text-indigo-300 font-bold">{cfg.symbol}{pool.toFixed(cfg.decimals)}</div>
-            </div>
-            <div className="w-px bg-white/5" />
-            <div className="text-center">
-              <div className="text-gray-500 text-[10px]">You Win</div>
-              <div className="text-emerald-400 font-bold">{cfg.symbol}{win.toFixed(cfg.decimals)}</div>
-            </div>
-          </div>
-
-          <button 
-            onPointerDown={() => { cancelQueue(); setScreen('home') }}
-            className="bg-transparent border border-gray-800 text-gray-500 hover:text-white px-8 py-3 rounded-xl font-bold text-sm tracking-wider transition"
-          >
-            ✕ Cancel Search
-          </button>
+          <div className="text-gray-600 text-[10px] uppercase font-bold tracking-wider mt-1">searching...</div>
         </div>
+
+        <div className="text-gray-400 text-xs text-center max-w-[260px] leading-relaxed">
+          {status || '🔍 Matching you with a player at the same stake...'}
+        </div>
+
+        <div className="flex gap-5 bg-[#111827] border border-white/5 rounded-xl py-3 px-6 shadow-inner">
+          <div className="text-center">
+            <div className="text-gray-500 text-[10px]">Pool</div>
+            <div className="text-indigo-300 font-bold">{cfg.symbol}{pool.toFixed(cfg.decimals)}</div>
+          </div>
+          <div className="w-px bg-white/5" />
+          <div className="text-center">
+            <div className="text-gray-500 text-[10px]">You Win</div>
+            <div className="text-emerald-400 font-bold">{cfg.symbol}{win.toFixed(cfg.decimals)}</div>
+          </div>
+        </div>
+
+        <button 
+          onPointerDown={() => { cancelQueue(); setScreen('home') }}
+          className="bg-transparent border border-gray-800 text-gray-500 hover:text-white px-8 py-3 rounded-xl font-bold text-sm tracking-wider transition"
+        >
+          ✕ Cancel Search
+        </button>
       </div>
     )
   }
 
   function renderLobby() {
     return (
-      <div className="text-white flex justify-center items-center min-h-screen p-0 sm:p-4 bg-[#03010a] font-sans">
-        <div className="w-full max-w-md bg-[#0a0516] h-screen sm:h-[850px] flex flex-col justify-between shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden border-x border-slate-900 sm:rounded-3xl p-5 items-center justify-center space-y-6">
-          <div className="text-5xl">⚔️</div>
-          <h2 className="font-black text-xl text-purple-400 tracking-wide">Match Created!</h2>
-          <p className="text-gray-500 text-xs">Share this ID with your opponent</p>
+      <div className="flex-1 flex flex-col items-center justify-center p-5 space-y-6 h-full bg-[#0a0516]">
+        <div className="text-5xl">⚔️</div>
+        <h2 className="font-black text-xl text-purple-400 tracking-wide">Match Created!</h2>
+        <p className="text-gray-500 text-xs">Share this ID with your opponent</p>
 
-          <div className="bg-[#111827] border border-white/5 rounded-xl p-4 w-full text-center space-y-2">
-            <p className="text-gray-500 text-[10px] uppercase font-bold tracking-wider">Match ID</p>
-            <div className="bg-[#0f1f3d] border border-[#1a3a5c] rounded-lg p-3 font-mono text-xs text-indigo-300 word-break-all select-all">
-              {matchId}
-            </div>
-            <button 
-              onPointerDown={() => { navigator.clipboard.writeText(matchId); setStatus('✅ Copied!') }}
-              className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold text-xs py-3 rounded-lg mt-2 shadow-md uppercase tracking-wider"
-            >
-              📋 Copy Match ID
-            </button>
+        <div className="bg-[#111827] border border-white/5 rounded-xl p-4 w-full text-center space-y-2">
+          <p className="text-gray-500 text-[10px] uppercase font-bold tracking-wider">Match ID</p>
+          <div className="bg-[#0f1f3d] border border-[#1a3a5c] rounded-lg p-3 font-mono text-xs text-indigo-300 word-break-all select-all">
+            {matchId}
           </div>
-
-          <div className="text-gray-400 text-xs animate-pulse">⏳ Waiting for opponent...</div>
-          {status && <div className="text-emerald-400 text-xs font-semibold">{status}</div>}
-
           <button 
-            onPointerDown={reset} 
-            className="bg-transparent border border-gray-800 text-gray-500 hover:text-white px-8 py-3 rounded-xl font-bold text-xs tracking-wider transition uppercase"
+            onPointerDown={() => { navigator.clipboard.writeText(matchId); setStatus('✅ Copied!') }}
+            className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold text-xs py-3 rounded-lg mt-2 shadow-md uppercase tracking-wider"
           >
-            ← Cancel
+            📋 Copy Match ID
           </button>
         </div>
+
+        <div className="text-gray-400 text-xs animate-pulse">⏳ Waiting for opponent...</div>
+        {status && <div className="text-emerald-400 text-xs font-semibold">{status}</div>}
+
+        <button 
+          onPointerDown={reset} 
+          className="bg-transparent border border-gray-800 text-gray-500 hover:text-white px-8 py-3 rounded-xl font-bold text-xs tracking-wider transition uppercase"
+        >
+          ← Cancel
+        </button>
       </div>
     )
   }
@@ -1634,107 +1628,105 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
     const showHints  = isBot && difficulty === 'easy'
 
     return (
-      <div className="text-white flex justify-center items-center min-h-screen p-0 sm:p-4 bg-[#03010a] font-sans">
-        <div className="w-full max-w-md bg-[#0a0516] h-screen sm:h-[850px] flex flex-col justify-between shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden border-x border-slate-900 sm:rounded-3xl p-3.5 space-y-3.5">
-          {/* Header */}
-          <div className="flex justify-between items-center w-full">
+      <div className="flex-1 flex flex-col justify-between p-3.5 space-y-3.5 h-full bg-[#0a0516] overflow-y-auto no-scrollbar">
+        {/* Header */}
+        <div className="flex justify-between items-center w-full">
+          <div>
+            <div className="font-black text-sm text-purple-400 tracking-wide">♟ CHESS ARENA</div>
+            <div className="text-gray-500 text-[10px]">
+              {isBot
+                ? <>You play <strong className="text-indigo-300">{playerColor}</strong> · {difficulty}</>
+                : <>You are <strong className="text-indigo-300">{color}</strong> · {cfg.symbol}{stake} stake</>
+              }
+            </div>
+          </div>
+          <div className={`border rounded-lg px-3 py-1 text-[11px] font-black uppercase shadow-sm ${
+            botThinking 
+              ? 'bg-amber-500/10 border-amber-500/40 text-amber-400' 
+              : humanTurn 
+              ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400' 
+              : 'bg-indigo-500/10 border-indigo-500/40 text-indigo-400'
+          }`}>
+            {botThinking ? '🤖 Thinking' : humanTurn ? '⚡️ Your turn' : '⏳ Waiting'}
+          </div>
+        </div>
+
+        {/* Status Bar */}
+        <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl py-2.5 px-4 text-center text-xs font-semibold text-indigo-300 w-full shadow-inner">
+          {status || '♟ Game in progress'}
+        </div>
+
+        {/* Custom Chessboard Container */}
+        <div className="w-full flex justify-center">
+          <div className="w-full max-w-[390px] aspect-square">
+            <ChessBoard
+              chess={chessRef.current}
+              orientation={boardOri}
+              selectedSq={humanTurn ? selectedSq : null}
+              legalTargets={humanTurn ? legalTargets : []}
+              onSquareTap={isBot ? handleSquareTap : handleMultiSquareTap}
+              showHints={showHints}
+              lastMove={lastMove}
+              checkedKingSq={checkedKingSq}
+            />
+          </div>
+        </div>
+
+        {/* Easy mode hints */}
+        {showHints && humanTurn && !gameOver && (
+          <div className="text-emerald-400 text-[10px] text-center font-bold tracking-wide animate-pulse">
+            💡 Tap any piece to see where it can move
+          </div>
+        )}
+
+        {/* Move History */}
+        {isBot && moveHistory.length > 0 && (
+          <div className="bg-[#111827] border border-white/5 rounded-xl p-2.5 max-h-[70px] overflow-y-auto no-scrollbar w-full shadow-inner">
+            <div className="flex flex-wrap gap-1.5">
+              {moveHistory.map((m, i) => (
+                <span key={i} className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  i % 2 === 0 ? 'bg-white/5 text-gray-400' : 'bg-indigo-500/10 text-indigo-300'
+                }`}>
+                  {i % 2 === 0 ? `${Math.floor(i/2)+1}.` : ''}{m}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Prize pool summary */}
+        {!isBot && (
+          <div className="flex justify-between items-center w-full bg-[#111827] border border-white/5 rounded-xl py-2 px-4 shadow-inner text-xs">
             <div>
-              <div className="font-black text-sm text-purple-400 tracking-wide">♟ CHESS ARENA</div>
-              <div className="text-gray-500 text-[10px]">
-                {isBot
-                  ? <>You play <strong className="text-indigo-300">{playerColor}</strong> · {difficulty}</>
-                  : <>You are <strong className="text-indigo-300">{color}</strong> · {cfg.symbol}{stake} stake</>
-                }
-              </div>
+              <div className="text-gray-500 text-[9px]">Prize Pool</div>
+              <div className="text-emerald-400 font-bold">{cfg.symbol}{pool.toFixed(cfg.decimals)} {cfg.unit}</div>
             </div>
-            <div className={`border rounded-lg px-3 py-1 text-[11px] font-black uppercase shadow-sm ${
-              botThinking 
-                ? 'bg-amber-500/10 border-amber-500/40 text-amber-400' 
-                : humanTurn 
-                ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400' 
-                : 'bg-indigo-500/10 border-indigo-500/40 text-indigo-400'
-            }`}>
-              {botThinking ? '🤖 Thinking' : humanTurn ? '⚡️ Your turn' : '⏳ Waiting'}
+            <div className="w-px h-6 bg-white/5" />
+            <div className="text-right">
+              <div className="text-gray-500 text-[9px]">Winner Gets</div>
+              <div className="text-indigo-300 font-bold">{cfg.symbol}{win.toFixed(cfg.decimals)} {cfg.unit}</div>
             </div>
           </div>
+        )}
 
-          {/* Status Bar */}
-          <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl py-2.5 px-4 text-center text-xs font-semibold text-indigo-300 w-full shadow-inner">
-            {status || '♟ Game in progress'}
-          </div>
-
-          {/* Custom Chessboard Container */}
-          <div className="w-full flex justify-center">
-            <div className="w-full max-w-[390px] aspect-square">
-              <ChessBoard
-                chess={chessRef.current}
-                orientation={boardOri}
-                selectedSq={humanTurn ? selectedSq : null}
-                legalTargets={humanTurn ? legalTargets : []}
-                onSquareTap={isBot ? handleSquareTap : handleMultiSquareTap}
-                showHints={showHints}
-                lastMove={lastMove}
-                checkedKingSq={checkedKingSq}
-              />
-            </div>
-          </div>
-
-          {/* Easy mode hints */}
-          {showHints && humanTurn && !gameOver && (
-            <div className="text-emerald-400 text-[10px] text-center font-bold tracking-wide animate-pulse">
-              💡 Tap any piece to see where it can move
-            </div>
-          )}
-
-          {/* Move History */}
-          {isBot && moveHistory.length > 0 && (
-            <div className="bg-[#111827] border border-white/5 rounded-xl p-2.5 max-h-[70px] overflow-y-auto no-scrollbar w-full shadow-inner">
-              <div className="flex flex-wrap gap-1.5">
-                {moveHistory.map((m, i) => (
-                  <span key={i} className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    i % 2 === 0 ? 'bg-white/5 text-gray-400' : 'bg-indigo-500/10 text-indigo-300'
-                  }`}>
-                    {i % 2 === 0 ? `${Math.floor(i/2)+1}.` : ''}{m}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Prize pool summary */}
-          {!isBot && (
-            <div className="flex justify-between items-center w-full bg-[#111827] border border-white/5 rounded-xl py-2 px-4 shadow-inner text-xs">
-              <div>
-                <div className="text-gray-500 text-[9px]">Prize Pool</div>
-                <div className="text-emerald-400 font-bold">{cfg.symbol}{pool.toFixed(cfg.decimals)} {cfg.unit}</div>
-              </div>
-              <div className="w-px h-6 bg-white/5" />
-              <div className="text-right">
-                <div className="text-gray-500 text-[9px]">Winner Gets</div>
-                <div className="text-indigo-300 font-bold">{cfg.symbol}{win.toFixed(cfg.decimals)} {cfg.unit}</div>
-              </div>
-            </div>
-          )}
-
-          {/* Control Buttons */}
-          <div className="flex gap-2.5 w-full">
-            {(result || gameOver) && (
-              <button 
-                onPointerDown={isBot ? startVsComputer : reset}
-                className="flex-1 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white font-black text-xs py-3.5 rounded-xl uppercase tracking-wider shadow-lg transition"
-              >
-                🔄 Play Again
-              </button>
-            )}
+        {/* Control Buttons */}
+        <div className="flex gap-2.5 w-full">
+          {(result || gameOver) && (
             <button 
-              onPointerDown={reset}
-              className={`py-3.5 rounded-xl font-black text-xs tracking-wider transition uppercase border border-gray-800 text-gray-500 hover:text-white ${
-                result || gameOver ? 'px-5' : 'flex-grow'
-              }`}
+              onPointerDown={isBot ? startVsComputer : reset}
+              className="flex-1 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white font-black text-xs py-3.5 rounded-xl uppercase tracking-wider shadow-lg transition"
             >
-              ← Home
+              🔄 Play Again
             </button>
-          </div>
+          )}
+          <button 
+            onPointerDown={reset}
+            className={`py-3.5 rounded-xl font-black text-xs tracking-wider transition uppercase border border-gray-800 text-gray-500 hover:text-white ${
+              result || gameOver ? 'px-5' : 'flex-grow'
+            }`}
+          >
+            ← Home
+          </button>
         </div>
       </div>
     )
@@ -1763,7 +1755,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         )}
 
         {/* Scrollable content area */}
-        <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col justify-between">
+        <div className="flex-1 flex flex-col justify-between overflow-hidden">
           {screen === 'home' && renderHome()}
           {screen === 'profile' && <ProfileScreen onBack={() => setScreen('home')} />}
           {screen === 'help' && renderHelp()}
