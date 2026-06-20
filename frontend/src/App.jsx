@@ -408,6 +408,128 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
     prev.showHints             === next.showHints
   )
 })
+/*// ─── CUSTOM CHESS BOARD ───────────────────────────────────────────────────────
+const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap, showHints, lastMove, checkedKingSq }) {
+  const files = ['a','b','c','d','e','f','g','h']
+  const ranks = ['8','7','6','5','4','3','2','1']
+
+  // flip for black orientation
+  const displayFiles = orientation === 'black' ? [...files].reverse() : files
+  const displayRanks = orientation === 'black' ? [...ranks].reverse() : ranks
+
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(8, 1fr)',
+      width: '100%',
+      aspectRatio: '1 / 1',
+      borderRadius: 6,
+      overflow: 'hidden',
+      boxShadow: '0 8px 32px rgba(0,0,0,.7)',
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      touchAction: 'manipulation'
+    }}>
+      {displayRanks.map(rank =>
+        displayFiles.map(file => {
+          const sq = file + rank
+          const fileIdx = files.indexOf(file)
+          const rankIdx = ranks.indexOf(rank)
+          const isLight = (fileIdx + rankIdx) % 2 === 0
+          const piece = chess.get(sq)
+          const pieceKey = piece ? piece.color + piece.type.toUpperCase() : null
+          const isSelected = sq === selectedSq
+          const isLegal = legalTargets.includes(sq)
+          const isLastFrom = lastMove && lastMove.from === sq
+          const isLastTo   = lastMove && lastMove.to === sq
+          const hasPiece = !!piece
+
+          // Square background
+          const isCheckedKing = sq === checkedKingSq
+          let bg = isLight ? '#FCD34D' : '#B45309'
+          if (isSelected)           bg = '#6366F1'
+          else if (isCheckedKing)   bg = '#EF4444'                          // red — king in check
+          else if (isLastFrom || isLastTo) bg = isLight ? '#a3e635' : '#65a30d'
+
+          return (
+            <div
+              key={sq}
+              onPointerDown={(e) => {
+                e.preventDefault()
+                onSquareTap(sq)
+              }}
+              style={{
+                position: 'relative',
+                background: bg,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {/* Legal move indicator }
+              {isLegal && (
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
+                  zIndex: 2
+                }}>
+                  {hasPiece ? (
+                    // Capture ring
+                    <div style={{
+                      width: '90%', height: '90%',
+                      borderRadius: '50%',
+                      border: showHints ? '4px solid rgba(16,185,129,0.85)' : '3px solid rgba(255,255,255,0.4)',
+                      boxSizing: 'border-box'
+                    }} />
+                  ) : (
+                    // Move dot
+                    <div style={{
+                      width: showHints ? '44%' : '30%',
+                      height: showHints ? '44%' : '30%',
+                      borderRadius: '50%',
+                      background: showHints ? 'rgba(16,185,129,0.8)' : 'rgba(255,255,255,0.35)'
+                    }} />
+                  )}
+                </div>
+              )}
+
+              {/* Piece }
+              {pieceKey && (
+                <span style={{
+                  fontSize: 'clamp(20px, 6vw, 42px)',
+                  lineHeight: 1,
+                  zIndex: 3,
+                  filter: isSelected ? 'brightness(1.4) drop-shadow(0 0 6px rgba(255,255,255,0.8))' : 'drop-shadow(1px 1px 1px rgba(0,0,0,0.5))',
+                  transition: 'filter 0.1s'
+                }}>
+                  {PIECES[pieceKey]}
+                </span>
+              )}
+
+              {/* Rank/File labels on edge squares }
+              {file === displayFiles[0] && (
+                <span style={{ position: 'absolute', top: 2, left: 3, fontSize: 9, fontWeight: 700, color: isLight ? '#B45309' : '#FCD34D', opacity: 0.7, lineHeight: 1 }}>
+                  {rank}
+                </span>
+              )}
+              {rank === displayRanks[7] && (
+                <span style={{ position: 'absolute', bottom: 2, right: 3, fontSize: 9, fontWeight: 700, color: isLight ? '#B45309' : '#FCD34D', opacity: 0.7, lineHeight: 1 }}>
+                  {file}
+                </span>
+              )}
+            </div>
+          )
+        })
+      )}
+    </div>
+  )
+}*/
 
 // ─── PROFILE SCREEN ───────────────────────────────────────────────────────────
 function ProfileScreen({ onBack }) {
@@ -1079,6 +1201,29 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         <button onPointerDown={() => setMode('human')}    style={S.modeBtn(mode === 'human')}>⚔️ vs Human</button>
       </div>
 
+      {mode === 'computer' && (
+        <div style={S.box}>
+          <p style={{ color: '#6B7280', fontSize: '.72rem', fontWeight: 700, letterSpacing: '1px', marginBottom: 10 }}>PLAY AS</p>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            <button onPointerDown={() => setPlayerColor('white')} style={S.diffBtn(playerColor === 'white', '#F9FAFB')}>♙ White</button>
+            <button onPointerDown={() => setPlayerColor('black')} style={S.diffBtn(playerColor === 'black', '#818CF8')}>♟ Black</button>
+          </div>
+          <p style={{ color: '#6B7280', fontSize: '.72rem', fontWeight: 700, letterSpacing: '1px', marginBottom: 10 }}>DIFFICULTY</p>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <button onPointerDown={() => setDifficulty('easy')}   style={S.diffBtn(difficulty === 'easy',   '#10B981')}>🟢 Easy</button>
+            <button onPointerDown={() => setDifficulty('medium')} style={S.diffBtn(difficulty === 'medium', '#F59E0B')}>🟡 Medium</button>
+            <button onPointerDown={() => setDifficulty('hard')}   style={S.diffBtn(difficulty === 'hard',   '#EF4444')}>🔴 Hard</button>
+          </div>
+          {difficulty === 'easy' && (
+            <p style={{ color: '#10B981', fontSize: '.7rem', margin: '8px 0 14px' }}>
+              💡 Easy shows all possible moves when you tap a piece
+            </p>
+          )}
+          <button onPointerDown={startVsComputer} style={S.btn('linear-gradient(135deg,#6366F1,#8B5CF6)', false)}>
+            🤖 Play vs Computer
+          </button>
+        </div>
+      )}
 
       {mode === 'human' && (
         <>
