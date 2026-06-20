@@ -93,105 +93,50 @@ function minimax(chess, depth, alpha, beta, maximizing) {
   }
 }
 
-// ─── WEB WORKER: minimax runs off main thread — UI stays fluid ────────────────
-// Inline blob worker — no extra file needed, works on Vercel/any static host
-const WORKER_CODE = `
-importScripts('https://cdn.jsdelivr.net/npm/chess.js@1.0.0/dist/cjs/chess.js')
-
-const PIECE_VALUE = { p:100, n:320, b:330, r:500, q:900, k:20000 }
-const PST = {
-  p:[0,0,0,0,0,0,0,0,50,50,50,50,50,50,50,50,10,10,20,30,30,20,10,10,5,5,10,25,25,10,5,5,0,0,0,20,20,0,0,0,5,-5,-10,0,0,-10,-5,5,5,10,10,-20,-20,10,10,5,0,0,0,0,0,0,0,0],
-  n:[-50,-40,-30,-30,-30,-30,-40,-50,-40,-20,0,0,0,0,-20,-40,-30,0,10,15,15,10,0,-30,-30,5,15,20,20,15,5,-30,-30,0,15,20,20,15,0,-30,-30,5,10,15,15,10,5,-30,-40,-20,0,5,5,0,-20,-40,-50,-40,-30,-30,-30,-30,-40,-50],
-  b:[-20,-10,-10,-10,-10,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,10,10,5,0,-10,-10,5,5,10,10,5,5,-10,-10,0,10,10,10,10,0,-10,-10,10,10,10,10,10,10,-10,-10,5,0,0,0,0,5,-10,-20,-10,-10,-10,-10,-10,-10,-20],
-  r:[0,0,0,0,0,0,0,0,5,10,10,10,10,10,10,5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,0,0,0,5,5,0,0,0],
-  q:[-20,-10,-10,-5,-5,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,5,5,5,0,-10,-5,0,5,5,5,5,0,-5,0,0,5,5,5,5,0,-5,-10,5,5,5,5,5,0,-10,-10,0,5,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20],
-  k:[-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20]
-}
-
-function evaluate(chess) {
-  if (chess.isCheckmate()) return chess.turn()==='w' ? -99999 : 99999
-  if (chess.isDraw()) return 0
-  let score = 0
-  chess.board().forEach((row,ri) => row.forEach((p,fi) => {
-    if (!p) return
-    const idx = p.color==='w' ? (7-ri)*8+fi : ri*8+fi
-    const v = PIECE_VALUE[p.type] + (PST[p.type]?.[idx]||0)
-    score += p.color==='w' ? v : -v
-  }))
-  return score
-}
-
-function minimax(chess, depth, alpha, beta, max) {
-  if (depth===0||chess.isGameOver()) return evaluate(chess)
-  const moves = chess.moves()
-  if (max) {
-    let best=-Infinity
-    for (const m of moves) {
-      chess.move(m); best=Math.max(best,minimax(chess,depth-1,alpha,beta,false)); chess.undo()
-      alpha=Math.max(alpha,best); if(beta<=alpha) break
-    }
-    return best
-  } else {
-    let best=Infinity
-    for (const m of moves) {
-      chess.move(m); best=Math.min(best,minimax(chess,depth-1,alpha,beta,true)); chess.undo()
-      beta=Math.min(beta,best); if(beta<=alpha) break
-    }
-    return best
-  }
-}
-
-self.onmessage = function(e) {
-  const { fen, difficulty } = e.data
-  const chess = new Chess(fen)
-  const moves = chess.moves({ verbose: true })
-  if (!moves.length) { self.postMessage(null); return }
-  if (difficulty === 'easy') {
-    const m = moves[Math.floor(Math.random()*moves.length)]
-    self.postMessage(m.from+m.to+(m.promotion||'')); return
-  }
-  const depth = difficulty==='hard' ? 3 : 2
-  const isMax = chess.turn()==='w'
-  // Shuffle for variety
-  for (let i=moves.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[moves[i],moves[j]]=[moves[j],moves[i]]}
-  let bestScore=isMax?-Infinity:Infinity, bestMove=moves[0]
-  for (const move of moves) {
-    chess.move(move)
-    const score=minimax(chess,depth-1,-Infinity,Infinity,!isMax)
-    chess.undo()
-    if (isMax?score>bestScore:score<bestScore){bestScore=score;bestMove=move}
-  }
-  self.postMessage(bestMove.from+bestMove.to+(bestMove.promotion||''))
-}
-`
-
-// Create worker once — reuse across all moves
-let _worker = null
-function getWorker() {
-  if (_worker) return _worker
-  const blob = new Blob([WORKER_CODE], { type: 'application/javascript' })
-  _worker = new Worker(URL.createObjectURL(blob))
-  return _worker
-}
-
+// ─── BOT MOVE ENGINE — reliable setTimeout, works in all WebViews ─────────────
+// Web Workers with importScripts are blocked in Telegram WebView on many devices.
+// This runs on the main thread inside a setTimeout so the UI can update first,
+// then the engine runs. For depth-2/3 minimax this takes 50-200ms — imperceptible.
 function fetchAIMove(fen, difficulty) {
-  return new Promise((resolve, reject) => {
-    try {
-      const worker = getWorker()
-      // Each call gets a one-time message handler, then removes itself
-      const handler = (e) => { worker.removeEventListener('message', handler); resolve(e.data) }
-      worker.addEventListener('message', handler)
-      worker.postMessage({ fen, difficulty })
-    } catch {
-      // Worker failed (e.g. some browsers block blob workers) — fall back to main thread
-      setTimeout(() => {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      try {
         const chess = new Chess(fen)
         const moves = chess.moves({ verbose: true })
         if (!moves.length) return resolve(null)
-        if (difficulty === 'easy') { const m = moves[Math.floor(Math.random()*moves.length)]; return resolve(m.from+m.to+(m.promotion||'')) }
-        resolve(moves[0].from + moves[0].to)
-      }, 50)
-    }
+
+        // Easy — random legal move, instant
+        if (difficulty === 'easy') {
+          const m = moves[Math.floor(Math.random() * moves.length)]
+          return resolve(m.from + m.to + (m.promotion || ''))
+        }
+
+        // Shuffle moves for variety before searching
+        for (let i = moves.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [moves[i], moves[j]] = [moves[j], moves[i]]
+        }
+
+        const depth = difficulty === 'hard' ? 3 : 2
+        const isMax = chess.turn() === 'w'
+        let bestScore = isMax ? -Infinity : Infinity
+        let bestMove = moves[0]
+
+        for (const move of moves) {
+          chess.move(move)
+          const score = minimax(chess, depth - 1, -Infinity, Infinity, !isMax)
+          chess.undo()
+          if (isMax ? score > bestScore : score < bestScore) {
+            bestScore = score
+            bestMove = move
+          }
+        }
+
+        resolve(bestMove.from + bestMove.to + (bestMove.promotion || ''))
+      } catch {
+        resolve(null)
+      }
+    }, 80) // 80ms delay — lets React render "thinking..." before engine starts
   })
 }
 
@@ -200,14 +145,13 @@ const AudioCtx = window.AudioContext || window.webkitAudioContext
 function createSoundEngine() {
   let ctx = null
 
-  
   function getCtx() {
     if (!AudioCtx) return null
     if (!ctx) ctx = new AudioCtx()
     // Resume if suspended (browser autoplay policy)
     if (ctx.state === 'suspended') ctx.resume()
     return ctx
-    }
+}
 
   function playTone({ type = 'sine', freq, freq2, duration, volume = 0.4, attack = 0.01, decay = 0.1, fadeStart, notes }) {
     const c = getCtx()
