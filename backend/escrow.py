@@ -38,7 +38,6 @@ class UserRecord:
         self.locked_balance   = Decimal("0")
         self.status           = "active"   # active | flagged | banned
         self.created_at       = datetime.now(timezone.utc)
-        self.phone_number     = None
 
     def total_balance(self):
         return self.playable_balance + self.locked_balance
@@ -50,7 +49,6 @@ class UserRecord:
             "playable_balance": float(self.playable_balance),
             "locked_balance":   float(self.locked_balance),
             "status":           self.status,
-            "phone_number":     self.phone_number,
         }
 
 
@@ -75,7 +73,6 @@ class TransactionRecord:
         self.amount     = Decimal(str(amount))
         self.direction  = direction     # "in" or "out"
         self.note       = note
-        self.status     = "completed"
         self.created_at = datetime.now(timezone.utc)
 
     def to_dict(self):
@@ -85,7 +82,6 @@ class TransactionRecord:
             "amount":     float(self.amount),
             "direction":  self.direction,
             "note":       self.note,
-            "status":     self.status,
             "created_at": self.created_at.isoformat(),
         }
 
@@ -98,9 +94,6 @@ def get_or_create_user(telegram_id: int, username: str) -> UserRecord:
     """Get existing user or create a new one with zero balance."""
     if telegram_id not in _users:
         _users[telegram_id] = UserRecord(telegram_id, username)
-    else:
-        if username and _users[telegram_id].username != username:
-            _users[telegram_id].username = username
     return _users[telegram_id]
 
 
@@ -329,21 +322,3 @@ def get_owner_earnings() -> dict:
         "total_matches_raked":  len(rake_txs),
         "transactions":         [t.to_dict() for t in reversed(rake_txs[-50:])],
     }
-
-
-def record_bot_game(telegram_id: int, outcome: str, difficulty: str):
-    """Records a bot game as a zero-stake transaction for history tracking."""
-    tx_type = f"bot_{outcome}"  # bot_win, bot_loss, bot_draw
-    direction = "in" if outcome == "win" else "out"
-    note = f"VS AI ({difficulty.capitalize()})"
-    
-    # Ensure user exists
-    get_or_create_user(telegram_id, f"user_{telegram_id}")
-    
-    tx = TransactionRecord(telegram_id, None, tx_type, Decimal("0"), direction, note)
-    # Set status to completed since bot games are processed instantly
-    tx.status = "completed"
-    
-    _transactions.append(tx)
-    return tx.to_dict()
-

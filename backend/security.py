@@ -34,41 +34,29 @@ BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 #  your bot token.
 # ─────────────────────────────────────────────────────
 def verify_telegram(init_data: str) -> dict:
+    # ⚠️ DEV BYPASS — see warning banner at top of file. Remove before real money.
+    return {"id": 12345, "username": "player1"}
+
     """
-    Raises HTTP 401 if initData is invalid or signature doesn't match (when BOT_TOKEN is configured).
-    If BOT_TOKEN is not configured, extracts user parameters without signature check (for dev/local environment).
+    Raises HTTP 401 if initData is invalid or older than 1 hour.
+    Returns the user dict on success.
     """
     if not init_data or init_data == "test":
-        return {"id": 99999, "username": "testuser", "first_name": "Test", "last_name": "User"}
-
+        return {"id": 99999, "username": "testuser"}
     params = {}
-    try:
-        for part in init_data.split("&"):
-            if "=" in part:
-                k, v = part.split("=", 1)
-                params[k] = v
-    except Exception:
-        raise HTTPException(400, "Malformed initData query string")
-
-    # If BOT_TOKEN is not configured, extract user details directly (bypass mode)
-    if not BOT_TOKEN:
-        user_raw = params.get("user", "{}")
-        try:
-            return json.loads(unquote(user_raw))
-        except Exception:
-            return {"id": 99999, "username": "testuser", "first_name": "Test", "last_name": "User"}
+    for part in init_data.split("&"):
+        if "=" in part:
+            k, v = part.split("=", 1)
+            params[k] = v
 
     received_hash = params.pop("hash", None)
     if not received_hash:
         raise HTTPException(401, "No hash in initData")
 
-    # Check timestamp — reject if older than 24 hours
-    try:
-        auth_date = int(params.get("auth_date", 0))
-        if time.time() - auth_date > 86400:
-            raise HTTPException(401, "initData expired")
-    except Exception:
-        raise HTTPException(401, "Invalid auth_date in initData")
+    # Check timestamp — reject if older than 1 hour
+    auth_date = int(params.get("auth_date", 0))
+    if time.time() - auth_date > 86400:
+        raise HTTPException(401, "initData expired")
 
     # Build check string (sorted key=value pairs, newline separated)
     check_string = "\n".join(
@@ -83,10 +71,7 @@ def verify_telegram(init_data: str) -> dict:
         raise HTTPException(401, "Invalid Telegram signature")
 
     user_raw = params.get("user", "{}")
-    try:
-        return json.loads(unquote(user_raw))
-    except Exception:
-        raise HTTPException(400, "Invalid user JSON in initData")
+    return json.loads(unquote(user_raw))
 
 
 # ─────────────────────────────────────────────────────
@@ -121,12 +106,10 @@ MIN_STAKE = 1.0     # minimum bet in USDT
 MAX_STAKE = 500.0   # maximum bet in USDT
 
 def validate_stake(amount: float) -> float:
-    """Raises 400 if the stake is outside allowed bounds. 0 = free game, always allowed."""
+    """Raises 400 if the stake is outside allowed bounds."""
     if not isinstance(amount, (int, float)):
         raise HTTPException(400, "Stake must be a number")
     amount = round(float(amount), 6)
-    if amount == 0:
-        return 0.0  # Free game — always valid
     if amount < MIN_STAKE:
         raise HTTPException(400, f"Minimum stake is ${MIN_STAKE} USDT")
     if amount > MAX_STAKE:

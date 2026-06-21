@@ -1,54 +1,52 @@
-﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Chess } from 'chess.js'
 
 const API = 'https://chess-bot-production-efa2.up.railway.app'
 const WSS = 'wss://chess-bot-production-efa2.up.railway.app'
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-// â”€â”€â”€ CURRENCY CONFIG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── CURRENCY CONFIG ──────────────────────────────────────────────────────────
 // Stakes, symbols, and decimals per currency.
-// All financial validation happens SERVER-SIDE â€” this is display config only.
+// All financial validation happens SERVER-SIDE — this is display config only.
 const CURRENCY_CONFIG = {
   USDT: {
     symbol: '$',
     unit: 'USDT',
-    icon: 'ðŸ’µ',
+    icon: '💵',
     stakes: [0, 1, 5, 10, 25, 50],
     decimals: 2,
     color: '#26A17B',        // Tether green
-    description: 'Tether USD â€” stable, pegged 1:1 to US Dollar'
+    description: 'Tether USD — stable, pegged 1:1 to US Dollar'
   },
   TON: {
-    symbol: 'â—Ž',
+    symbol: '◎',
     unit: 'TON',
-    icon: 'ðŸ’Ž',
+    icon: '💎',
     stakes: [0, 0.5, 1, 2, 5, 10],
     decimals: 2,
     color: '#0088CC',        // TON blue
-    description: 'The Open Network â€” Telegram\'s native blockchain'
+    description: 'The Open Network — Telegram\'s native blockchain'
   },
   STARS: {
-    symbol: 'â˜…',
+    symbol: '★',
     unit: 'Stars',
-    icon: 'â­',
+    icon: '⭐',
     stakes: [0, 50, 100, 250, 500, 1000],
     decimals: 0,
     color: '#F59E0B',        // Gold
-    description: 'Telegram Stars â€” buy directly inside Telegram'
+    description: 'Telegram Stars — buy directly inside Telegram'
   }
 }
 
 const tg = window.Telegram?.WebApp
 const tgUser = tg?.initDataUnsafe?.user || { id: 0, username: 'Player' }
-const initData = tg?.initData || 'test'
 
-// â”€â”€â”€ PIECE UNICODE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── PIECE UNICODE ────────────────────────────────────────────────────────────
 const PIECES = {
-  wK:'â™”', wQ:'â™•', wR:'â™–', wB:'â™—', wN:'â™˜', wP:'â™™',
-  bK:'â™š', bQ:'â™›', bR:'â™œ', bB:'â™', bN:'â™ž', bP:'â™Ÿ'
+  wK:'♔', wQ:'♕', wR:'♖', wB:'♗', wN:'♘', wP:'♙',
+  bK:'♚', bQ:'♛', bR:'♜', bB:'♝', bN:'♞', bP:'♟'
 }
 
-
-// â”€â”€â”€ LOCAL CHESS ENGINE (minimax â€” instant, no API) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── LOCAL CHESS ENGINE (minimax — instant, no API) ──────────────────────────
 const PIECE_VALUE = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 }
 
 const PST = {
@@ -95,10 +93,10 @@ function minimax(chess, depth, alpha, beta, maximizing) {
   }
 }
 
-// â”€â”€â”€ BOT MOVE ENGINE â€” reliable setTimeout, works in all WebViews â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── BOT MOVE ENGINE — reliable setTimeout, works in all WebViews ─────────────
 // Web Workers with importScripts are blocked in Telegram WebView on many devices.
 // This runs on the main thread inside a setTimeout so the UI can update first,
-// then the engine runs. For depth-2/3 minimax this takes 50-200ms â€” imperceptible.
+// then the engine runs. For depth-2/3 minimax this takes 50-200ms — imperceptible.
 function fetchAIMove(fen, difficulty) {
   return new Promise(resolve => {
     setTimeout(() => {
@@ -107,7 +105,7 @@ function fetchAIMove(fen, difficulty) {
         const moves = chess.moves({ verbose: true })
         if (!moves.length) return resolve(null)
 
-        // Easy â€” random legal move, instant
+        // Easy — random legal move, instant
         if (difficulty === 'easy') {
           const m = moves[Math.floor(Math.random() * moves.length)]
           return resolve(m.from + m.to + (m.promotion || ''))
@@ -138,11 +136,11 @@ function fetchAIMove(fen, difficulty) {
       } catch {
         resolve(null)
       }
-    }, 80) // 80ms delay â€” lets React render "thinking..." before engine starts
+    }, 80) // 80ms delay — lets React render "thinking..." before engine starts
   })
 }
 
-// â”€â”€â”€ SOUND ENGINE (Web Audio API â€” no libraries needed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── SOUND ENGINE (Web Audio API — no libraries needed) ──────────────────────
 const AudioCtx = window.AudioContext || window.webkitAudioContext
 function createSoundEngine() {
   let ctx = null
@@ -188,18 +186,18 @@ function createSoundEngine() {
   }
 
   return {
-    // Soft woody thud â€” piece placed on board
+    // Soft woody thud — piece placed on board
     move() {
       playTone({ type: 'triangle', freq: 180, freq2: 90, duration: 0.18, volume: 0.5, attack: 0.005 })
     },
 
-    // Harder crack â€” piece taken
+    // Harder crack — piece taken
     capture() {
       playTone({ type: 'sawtooth', freq: 260, freq2: 80, duration: 0.22, volume: 0.45, attack: 0.005 })
       setTimeout(() => playTone({ type: 'triangle', freq: 120, duration: 0.15, volume: 0.3 }), 60)
     },
 
-    // Tense two-tone pulse â€” king is in check
+    // Tense two-tone pulse — king is in check
     check() {
       playTone({ notes: [
         { type: 'square', freq: 440, duration: 0.12, volume: 0.3, attack: 0.01 },
@@ -208,13 +206,13 @@ function createSoundEngine() {
       setTimeout(() => playTone({ type: 'square', freq: 554, duration: 0.14, volume: 0.3 }), 160)
     },
 
-    // Castling â€” double knock
+    // Castling — double knock
     castle() {
       playTone({ type: 'triangle', freq: 200, freq2: 110, duration: 0.16, volume: 0.45, attack: 0.005 })
       setTimeout(() => playTone({ type: 'triangle', freq: 160, freq2: 90, duration: 0.16, volume: 0.35, attack: 0.005 }), 120)
     },
 
-    // Rising arpeggio â€” game start
+    // Rising arpeggio — game start
     gameStart() {
       const notes = [261, 329, 392, 523]
       notes.forEach((f, i) => {
@@ -222,7 +220,7 @@ function createSoundEngine() {
       })
     },
 
-    // Triumphant fanfare â€” you win
+    // Triumphant fanfare — you win
     win() {
       const seq = [
         { freq: 392, dur: 120 }, { freq: 392, dur: 120 }, { freq: 392, dur: 120 },
@@ -235,7 +233,7 @@ function createSoundEngine() {
       })
     },
 
-    // Descending sad tones â€” you lose
+    // Descending sad tones — you lose
     lose() {
       const seq = [{ freq: 330, dur: 200 }, { freq: 277, dur: 200 }, { freq: 220, dur: 400 }]
       let t = 0
@@ -245,27 +243,27 @@ function createSoundEngine() {
       })
     },
 
-    // Neutral chord â€” draw
+    // Neutral chord — draw
     draw() {
       playTone({ type: 'sine', freq: 330, duration: 0.5, volume: 0.25, attack: 0.04 })
       playTone({ type: 'sine', freq: 392, duration: 0.5, volume: 0.2,  attack: 0.04 })
     },
 
-    // Soft click â€” UI button press
+    // Soft click — UI button press
     click() {
       playTone({ type: 'sine', freq: 600, freq2: 400, duration: 0.08, volume: 0.2, attack: 0.005 })
     }
   }
 }
 
-// Single instance â€” created lazily on first user interaction
+// Single instance — created lazily on first user interaction
 let _sfx = null
 function sfx() {
   if (!_sfx) _sfx = createSoundEngine()
   return _sfx
 }
 
-// Helper â€” call after chess.move() to auto-pick the right sound
+// Helper — call after chess.move() to auto-pick the right sound
 function playSoundForMove(move, chess) {
   if (!move) return
   if (chess.isCheckmate())      { sfx().win(); return }   // handled by game-over logic separately
@@ -274,7 +272,7 @@ function playSoundForMove(move, chess) {
   if (move.captured)            { sfx().capture(); return }
   sfx().move()
 }
-// â”€â”€â”€ CUSTOM CHESS BOARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── CUSTOM CHESS BOARD ───────────────────────────────────────────────────────
 const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selectedSq, legalTargets, onSquareTap, showHints, lastMove, checkedKingSq }) {
   const files = ['a','b','c','d','e','f','g','h']
   const ranks = ['8','7','6','5','4','3','2','1']
@@ -310,7 +308,7 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
           const isCheckedKing = sq === checkedKingSq
           const hasPiece = !!piece
 
-          // Square background â€” priority: selected > check > last move > normal
+          // Square background — priority: selected > check > last move > normal
           let bg = isLight ? '#FCD34D' : '#B45309'
           if (isSelected)              bg = '#6366F1'
           else if (isCheckedKing)      bg = '#EF4444'
@@ -397,7 +395,7 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
     </div>
   )
 }, (prev, next) => {
-  // Custom comparator â€” only re-render when chess-relevant props actually changed.
+  // Custom comparator — only re-render when chess-relevant props actually changed.
   // This stops the entire 64-square board re-rendering on every unrelated state update.
   return (
     prev.chess.fen()           === next.chess.fen()        &&
@@ -411,7 +409,7 @@ const ChessBoard = React.memo(function ChessBoard({ chess, orientation, selected
   )
 })
 
-// â”€â”€â”€ PROFILE SCREEN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── PROFILE SCREEN ───────────────────────────────────────────────────────────
 function ProfileScreen({ onBack }) {
   const [profile, setProfile]   = useState(null)
   const [txns, setTxns]         = useState([])
@@ -424,8 +422,8 @@ function ProfileScreen({ onBack }) {
       setLoading(true)
       try {
         const [meRes, txRes] = await Promise.all([
-          fetch(API + '/api/me',           { headers: { 'x-init-data': initData } }),
-          fetch(API + '/api/transactions', { headers: { 'x-init-data': initData } })
+          fetch(API + '/api/me',           { headers: { 'x-init-data': 'test' } }),
+          fetch(API + '/api/transactions', { headers: { 'x-init-data': 'test' } })
         ])
         if (meRes.ok)  setProfile(await meRes.json())
         if (txRes.ok)  setTxns((await txRes.json()).transactions || [])
@@ -440,27 +438,24 @@ function ProfileScreen({ onBack }) {
   const locked    = parseFloat(profile?.locked_balance    || 0)
   const total     = playable + locked
 
-  // Derive win/loss/draw counts from transaction history (including bot matches)
-  const wins   = txns.filter(t => t.type === 'winnings' || t.type === 'bot_win').length
-  const losses = txns.filter(t => t.type === 'rake' || t.type === 'loss' || t.type === 'bot_loss').length
+  // Derive win/loss/draw counts from transaction history
+  const wins   = txns.filter(t => t.type === 'winnings').length
+  const losses = txns.filter(t => t.type === 'rake' || t.type === 'loss').length
   const totalGames = wins + losses
 
-  // Type â†’ display config
+  // Type → display config
   function txMeta(type) {
-    if (type === 'deposit')  return { label: 'Deposit',   color: '#10B981', sign: '+', icon: 'â¬‡ï¸' }
-    if (type === 'withdraw') return { label: 'Withdraw',  color: '#EF4444', sign: '-', icon: 'â¬†ï¸' }
-    if (type === 'winnings') return { label: 'Winnings',  color: '#10B981', sign: '+', icon: 'ðŸ†' }
-    if (type === 'stake')    return { label: 'Stake',     color: '#F59E0B', sign: '-', icon: 'ðŸŽ¯' }
-    if (type === 'refund')   return { label: 'Refund',    color: '#6366F1', sign: '+', icon: 'â†©ï¸' }
-    if (type === 'rake')     return { label: 'Fee',       color: '#6B7280', sign: '-', icon: 'ðŸ’¸' }
-    if (type === 'bot_win')  return { label: 'VS AI (Won)',  color: '#10B981', sign: '',  icon: 'ðŸ¤–' }
-    if (type === 'bot_loss') return { label: 'VS AI (Lost)', color: '#EF4444', sign: '',  icon: 'ðŸ¤–' }
-    if (type === 'bot_draw') return { label: 'VS AI (Draw)', color: '#6366F1', sign: '',  icon: 'ðŸ¤–' }
-    return                          { label: type,        color: '#9CA3AF', sign: '',  icon: 'â€¢'  }
+    if (type === 'deposit')  return { label: 'Deposit',   color: '#10B981', sign: '+', icon: '⬇️' }
+    if (type === 'withdraw') return { label: 'Withdraw',  color: '#EF4444', sign: '-', icon: '⬆️' }
+    if (type === 'winnings') return { label: 'Winnings',  color: '#10B981', sign: '+', icon: '🏆' }
+    if (type === 'stake')    return { label: 'Stake',     color: '#F59E0B', sign: '-', icon: '🎯' }
+    if (type === 'refund')   return { label: 'Refund',    color: '#6366F1', sign: '+', icon: '↩️' }
+    if (type === 'rake')     return { label: 'Fee',       color: '#6B7280', sign: '-', icon: '💸' }
+    return                          { label: type,        color: '#9CA3AF', sign: '',  icon: '•'  }
   }
 
   function formatDate(iso) {
-    if (!iso) return 'â€”'
+    if (!iso) return '—'
     const d = new Date(iso)
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })
       + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
@@ -479,9 +474,9 @@ function ProfileScreen({ onBack }) {
     <div className="text-white flex justify-center items-center min-h-screen p-0 sm:p-4 bg-[#03010a] font-sans">
       <div className="w-full max-w-md bg-[#0a0516] h-screen sm:h-[850px] flex flex-col justify-between shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden border-x border-slate-900 sm:rounded-3xl">
         
-        {/* â”€â”€ Top header bar â”€â”€ */}
+        {/* ── Top header bar ── */}
         <header className="px-4 pt-3 pb-2 bg-[#0e071f] flex justify-between items-center border-b border-[#1b1233] shrink-0 z-50">
-          <button onClick={onBack} className="text-gray-400 hover:text-white transition">
+          <button onPointerDown={onBack} className="text-gray-400 hover:text-white transition">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
           </button>
           <div className="font-bold text-base tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-purple-300">My Account</div>
@@ -492,7 +487,7 @@ function ProfileScreen({ onBack }) {
         <div className="flex-grow overflow-y-auto no-scrollbar p-3 space-y-4 bg-[#080B14] pb-8">
           {loading && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '60px 20px', color: '#4B5563' }}>
-              <div style={{ fontSize: 32, animation: 'spin 1s linear infinite' }}>âŸ³</div>
+              <div style={{ fontSize: 32, animation: 'spin 1s linear infinite' }}>⟳</div>
               <div style={{ fontSize: '.85rem' }}>Loading your profile...</div>
             </div>
           )}
@@ -505,7 +500,7 @@ function ProfileScreen({ onBack }) {
 
           {!loading && !error && (
             <>
-              {/* â”€â”€ Avatar + identity card â”€â”€ */}
+              {/* ── Avatar + identity card ── */}
               <div style={{ background: 'linear-gradient(135deg,#111827,#1a2236)', border: '1px solid rgba(99,102,241,.2)', borderRadius: 16, padding: '20px 20px 16px', position: 'relative', overflow: 'hidden' }}>
                 {/* Glow blob */}
                 <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, background: 'rgba(99,102,241,.12)', borderRadius: '50%', filter: 'blur(30px)', pointerEvents: 'none' }} />
@@ -520,7 +515,7 @@ function ProfileScreen({ onBack }) {
                       @{tgUser.username || tgUser.first_name || 'Player'}
                     </div>
                     <div style={{ color: '#4B5563', fontSize: '.75rem', marginTop: 2 }}>
-                      Telegram ID: <span style={{ color: '#6366F1', fontFamily: 'monospace' }}>{tgUser.id || 'â€”'}</span>
+                      Telegram ID: <span style={{ color: '#6366F1', fontFamily: 'monospace' }}>{tgUser.id || '—'}</span>
                     </div>
                     <div style={{ display: 'inline-block', marginTop: 6, background: profile?.status === 'active' ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)', border: `1px solid ${profile?.status === 'active' ? 'rgba(16,185,129,.4)' : 'rgba(239,68,68,.4)'}`, borderRadius: 20, padding: '2px 10px', fontSize: '.68rem', fontWeight: 700, color: profile?.status === 'active' ? '#10B981' : '#EF4444', letterSpacing: '.5px' }}>
                       {(profile?.status || 'active').toUpperCase()}
@@ -537,7 +532,7 @@ function ProfileScreen({ onBack }) {
                 </div>
               </div>
 
-              {/* â”€â”€ Balance breakdown cards â”€â”€ */}
+              {/* ── Balance breakdown cards ── */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div style={{ background: '#111827', border: '1px solid rgba(16,185,129,.2)', borderRadius: 12, padding: '14px' }}>
                   <div style={{ color: '#4B5563', fontSize: '.68rem', fontWeight: 700, letterSpacing: '.8px', marginBottom: 6 }}>AVAILABLE</div>
@@ -551,7 +546,7 @@ function ProfileScreen({ onBack }) {
                 </div>
               </div>
 
-              {/* â”€â”€ Stats row â”€â”€ */}
+              {/* ── Stats row ── */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                 {[
                   { label: 'GAMES',  value: totalGames, color: '#A5B4FC' },
@@ -565,28 +560,28 @@ function ProfileScreen({ onBack }) {
                 ))}
               </div>
 
-              {/* â”€â”€ Deposit / Withdraw action buttons â”€â”€ */}
+              {/* ── Deposit / Withdraw action buttons ── */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <button onClick={() => alert('Deposit flow coming soon.\nSend USDT to your wallet address and contact support.')}
+                <button onPointerDown={() => alert('Deposit flow coming soon.\nSend USDT to your wallet address and contact support.')}
                   style={{ background: 'linear-gradient(135deg,#10B981,#059669)', border: 'none', borderRadius: 12, padding: '13px', color: '#fff', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
-                  â¬‡ï¸ Deposit
+                  ⬇️ Deposit
                 </button>
-                <button onClick={() => alert('Withdraw flow coming soon.\nMinimum withdrawal: $5 USDT.')}
+                <button onPointerDown={() => alert('Withdraw flow coming soon.\nMinimum withdrawal: $5 USDT.')}
                   style={{ background: playable >= 5 ? 'linear-gradient(135deg,#6366F1,#8B5CF6)' : '#1f2937', border: 'none', borderRadius: 12, padding: '13px', color: playable >= 5 ? '#fff' : '#4B5563', fontWeight: 800, fontSize: '.9rem', cursor: playable >= 5 ? 'pointer' : 'not-allowed', WebkitTapHighlightColor: 'transparent' }}>
-                  â¬†ï¸ Withdraw
+                  ⬆️ Withdraw
                 </button>
               </div>
               <div style={{ color: '#374151', fontSize: '.7rem', textAlign: 'center' }}>
-                Minimum withdrawal: $5.00 USDT Â· 10% platform fee on winnings
+                Minimum withdrawal: $5.00 USDT · 10% platform fee on winnings
               </div>
 
-              {/* â”€â”€ Tab switcher â”€â”€ */}
+              {/* ── Tab switcher ── */}
               <div style={{ display: 'flex', gap: 4, background: '#0d1117', borderRadius: 10, padding: 4 }}>
-                <button onClick={() => setTab('overview')} style={tabStyle(tab === 'overview')}>ðŸ“Š Overview</button>
-                <button onClick={() => setTab('history')}  style={tabStyle(tab === 'history')}>ðŸ“‹ History ({txns.length})</button>
+                <button onPointerDown={() => setTab('overview')} style={tabStyle(tab === 'overview')}>📊 Overview</button>
+                <button onPointerDown={() => setTab('history')}  style={tabStyle(tab === 'history')}>📋 History ({txns.length})</button>
               </div>
 
-              {/* â”€â”€ Overview tab â”€â”€ */}
+              {/* ── Overview tab ── */}
               {tab === 'overview' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {/* Win rate bar */}
@@ -608,33 +603,20 @@ function ProfileScreen({ onBack }) {
 
                   {/* Account info rows */}
                   {[
-                    { label: 'Account ID',   value: profile?.id ? profile.id.slice(0,8) + '...' : 'â€”', mono: true, copyVal: profile?.id },
-                    { label: 'Telegram ID',  value: tgUser.id || 'â€”', mono: true },
-                    { label: 'Phone Number', value: profile?.phone_number || 'Not Linked', mono: false },
+                    { label: 'Account ID',   value: profile?.id ? profile.id.slice(0,8) + '...' : '—', mono: true },
+                    { label: 'Telegram ID',  value: tgUser.id || '—', mono: true },
                     { label: 'Username',     value: '@' + (tgUser.username || tgUser.first_name || 'Player'), mono: false },
                     { label: 'Status',       value: (profile?.status || 'active').toUpperCase(), mono: false },
                   ].map(row => (
-                    <div 
-                      key={row.label} 
-                      onClick={() => {
-                        if (row.copyVal) {
-                          navigator.clipboard.writeText(row.copyVal)
-                          alert('âœ… Unique Account ID copied to clipboard!')
-                        }
-                      }}
-                      className={row.copyVal ? "cursor-pointer active:scale-95 transition" : ""}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 10, padding: '12px 14px' }}
-                    >
+                    <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#111827', border: '1px solid rgba(255,255,255,.06)', borderRadius: 10, padding: '12px 14px' }}>
                       <span style={{ color: '#6B7280', fontSize: '.8rem' }}>{row.label}</span>
-                      <span style={{ color: '#A5B4FC', fontSize: '.8rem', fontWeight: 700, fontFamily: row.mono ? 'monospace' : 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        {row.value} {row.copyVal && <span style={{ fontSize: '.7rem', opacity: 0.7 }}>ðŸ“‹</span>}
-                      </span>
+                      <span style={{ color: '#A5B4FC', fontSize: '.8rem', fontWeight: 700, fontFamily: row.mono ? 'monospace' : 'inherit' }}>{row.value}</span>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* â”€â”€ History tab â”€â”€ */}
+              {/* ── History tab ── */}
               {tab === 'history' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {txns.length === 0 && (
@@ -675,24 +657,24 @@ function ProfileScreen({ onBack }) {
 
         {/* Footer */}
         <footer className="bg-[#0b0617] border-t border-[#231545] grid grid-cols-5 text-center py-3 text-gray-300 text-xs font-black shrink-0 z-40 shadow-[0_-8px_25px_rgba(139,92,246,0.15)]">
-          <button onClick={onBack} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100">
-            <span className="text-lg">ðŸ </span> 
+          <button onPointerDown={onBack} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100">
+            <span className="text-lg">🏠</span> 
             <span>Home</span>
           </button>
-          <button onClick={() => alert('Leaderboard is displayed below on the home page.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-150">
-            <span className="text-lg">ðŸ†</span>
+          <button onPointerDown={() => alert('Leaderboard is displayed below on the home page.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-150">
+            <span className="text-lg">🏆</span>
             <span>Rank</span>
           </button>
           <button className="text-purple-200 flex flex-col items-center justify-center gap-1 drop-shadow-[0_0_12px_rgba(168,85,247,0.75)]">
-            <span className="text-lg">ðŸ“œ</span>
+            <span className="text-lg">📜</span>
             <span>History</span>
           </button>
-          <button onClick={() => alert('Support Chat coming soon.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100">
-            <span className="text-lg">ðŸ’¬</span>
+          <button onPointerDown={() => alert('Support Chat coming soon.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100">
+            <span className="text-lg">💬</span>
             <span>Chat</span>
           </button>
-          <button onClick={onBack} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100">
-            <span className="text-lg">ðŸ‘¤</span>
+          <button onPointerDown={onBack} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100">
+            <span className="text-lg">👤</span>
             <span>Me</span>
           </button>
         </footer>
@@ -702,7 +684,7 @@ function ProfileScreen({ onBack }) {
   )
 }
 
-// â”€â”€â”€ STYLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── STYLES ───────────────────────────────────────────────────────────────────
 const S = {
   page: {
     minHeight: '100vh', background: '#080B14', color: '#eaeaea',
@@ -748,7 +730,7 @@ const S = {
   })
 }
 
-// â”€â”€â”€ MAIN APP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen]   = useState('home')
   const helpFromRef           = useRef('home')
@@ -786,21 +768,11 @@ export default function App() {
   const [selectedSq, setSelectedSq]     = useState(null)
   const [legalTargets, setLegalTargets] = useState([])
 
-  // single chess instance â€” we force re-render by bumping a counter
+  // single chess instance — we force re-render by bumping a counter
   const chessRef  = useRef(new Chess())
   const [tick, setTick] = useState(0)  // bump to re-render board
   const wsRef     = useRef(null)
   const colorRef  = useRef(null)
-
-  // â”€â”€â”€ NEW: Open matches list, phone modal, game over overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const [openMatches, setOpenMatches]   = useState([])
-  const [showPhoneModal, setShowPhoneModal] = useState(false)
-  const [phoneInput, setPhoneInput]     = useState('')
-  const [userName, setUserName]         = useState(tgUser.first_name || tgUser.username || 'Player')
-  const [userAccountId, setUserAccountId] = useState('')
-  const [showGameOverlay, setShowGameOverlay] = useState(false)
-  const [gameOverOutcome, setGameOverOutcome] = useState(null) // 'win' | 'loss' | 'draw'
-  const [botGameSaved, setBotGameSaved] = useState(false)
 
   function bump() { setTick(t => t + 1) }
 
@@ -816,11 +788,11 @@ export default function App() {
   // Step 2: Style Select ('free' or 'bet')
   const handleSelectStyle = (styleType) => {
     if (currentStep < 1) {
-      setStatus('âš ï¸ First choice who u wanna play with!')
+      setStatus('⚠️ First choice who u wanna play with!')
       return
     }
     if (mode === 'computer' && styleType === 'bet') {
-      setStatus("âŒ Play With Bet is unacceptable against AI mode! Choose 'Play For Free'.")
+      setStatus("❌ Play With Bet is unacceptable against AI mode! Choose 'Play For Free'.")
       return
     }
 
@@ -842,39 +814,22 @@ export default function App() {
     setStatus('')
   }
 
-  // â”€â”€â”€ AUTO-REGISTER: runs once on load â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Calls /api/me â€” backend creates user row if first visit, returns profile if existing.
-  // Silent â€” user never sees a "sign up" screen.
+  // ─── AUTO-REGISTER: runs once on load ─────────────────────────────────────
+  // Calls /api/me — backend creates user row if first visit, returns profile if existing.
+  // Silent — user never sees a "sign up" screen.
   useEffect(() => {
     tg?.ready(); tg?.expand()
+    const initData = tg?.initData || 'test'
     fetch(API + '/api/me', { headers: { 'x-init-data': initData } })
       .then(r => r.json())
       .then(data => {
-        if (data?.balance?.playable !== undefined) {
+                if (data?.balance?.playable !== undefined) {
           setUserBalance(data.balance.playable)
         }
-        if (data?.username) setUserName(data.username)
-        if (data?.id) setUserAccountId(data.id)
-        // Show phone modal if phone is not linked yet
-        if (!data?.phone_number) setShowPhoneModal(true)
       })
-      .catch(() => {}) // Silent fail â€” app still works, just no balance shown
+      .catch(() => {}) // Silent fail — app still works, just no balance shown
   }, [])
-
-  // â”€â”€â”€ Periodically fetch open matches for the lobby list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  useEffect(() => {
-    if (screen !== 'home') return
-    function fetchOpen() {
-      fetch(API + '/api/matches/open', { headers: { 'x-init-data': initData } })
-        .then(r => r.ok ? r.json() : [])
-        .then(data => setOpenMatches(Array.isArray(data) ? data : []))
-        .catch(() => setOpenMatches([]))
-    }
-    fetchOpen()
-    const iv = setInterval(fetchOpen, 4000)
-    return () => clearInterval(iv)
-  }, [screen])
-  // â”€â”€â”€ VS COMPUTER: bot move trigger â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── VS COMPUTER: bot move trigger ────────────────────────────────────────
   useEffect(() => {
     if (screen !== 'game' || mode !== 'computer' || gameOver) return
     const chess = chessRef.current
@@ -882,7 +837,7 @@ export default function App() {
     if (chess.turn() !== botCol || chess.isGameOver()) return
 
     setBotThinking(true)
-    setStatus('ðŸ¤– Computer thinking...')
+    setStatus('🤖 Computer thinking...')
 
     const timer = setTimeout(() => {
       fetchAIMove(chess.fen(), difficulty).then(uci => {
@@ -896,7 +851,7 @@ export default function App() {
           setMoveHistory(h => [...h, move.san])
           checkComputerGameOver(chess)
           bump()
-          if (!chess.isGameOver()) setStatus('âš¡ï¸ Your turn!')
+          if (!chess.isGameOver()) setStatus('⚡️ Your turn!')
           }
         } catch {}
         setBotThinking(false)
@@ -909,29 +864,14 @@ export default function App() {
   function checkComputerGameOver(chess) {
     if (!chess.isGameOver()) return
     setGameOver(true)
-    let outcome = 'draw'
     if (chess.isCheckmate()) {
       const winner = chess.turn() === 'w' ? 'black' : 'white'
-      if (winner === playerColor) {
-        sfx().win(); setStatus('ðŸ† You win! Checkmate!')
-        outcome = 'win'
-      } else {
-        sfx().lose(); setStatus('ðŸ’€ Computer wins!')
-        outcome = 'loss'
-      }
+      if (winner === playerColor) { sfx().win(); setStatus('🏆 You win! Checkmate!') }
+      else                        { sfx().lose(); setStatus('💀 Computer wins!') }
     } else {
       sfx().draw()
-      setStatus('Â½ Draw!')
+      setStatus('½ Draw!')
     }
-    setGameOverOutcome(outcome)
-    setShowGameOverlay(true)
-    setBotGameSaved(false)
-    // Save bot game to history
-    fetch(API + '/api/history/bot', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-init-data': initData },
-      body: JSON.stringify({ outcome, difficulty })
-    }).then(() => setBotGameSaved(true)).catch(() => {})
   }
 
 function startVsComputer() {
@@ -939,19 +879,19 @@ function startVsComputer() {
     setGameOver(false); setBotThinking(false); setMoveHistory([])
     setResult(null); setSelectedSq(null); setLegalTargets([]); setLastMove(null)
     setScreen('game')
-    setStatus(playerColor === 'white' ? 'âš¡ï¸ Your turn!' : 'ðŸ¤– Computer plays first...')
+    setStatus(playerColor === 'white' ? '⚡️ Your turn!' : '🤖 Computer plays first...')
     sfx().gameStart()
     bump()
   }
 
-  // â”€â”€â”€ SQUARE TAP HANDLER (vs computer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── SQUARE TAP HANDLER (vs computer) ────────────────────────────────────
   function handleSquareTap(sq) {
     if (gameOver || botThinking) return
     const chess = chessRef.current
     const myCol = playerColor === 'white' ? 'w' : 'b'
     if (chess.turn() !== myCol) return
 
-    // If tapping a legal target â†’ execute move
+    // If tapping a legal target → execute move
     if (selectedSq && legalTargets.includes(sq)) {
       let move
       try { move = chess.move({ from: selectedSq, to: sq, promotion: 'q' }) }
@@ -977,7 +917,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
     }
   }
 
-  // â”€â”€â”€ SQUARE TAP HANDLER (multiplayer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── SQUARE TAP HANDLER (multiplayer) ────────────────────────────────────
   function handleMultiSquareTap(sq) {
     if (!myTurnUI || result) return
     const chess = chessRef.current
@@ -995,13 +935,13 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
       chessRef.current = probe
       setLastMove({ from: selectedSq, to: sq })
       setSelectedSq(null); setLegalTargets([])
-      setMyTurnUI(false); setStatus('â³ Sending move...')
+      setMyTurnUI(false); setStatus('⏳ Sending move...')
       bump()
 
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: 'move', move: selectedSq + sq + (move.promotion || '') }))
       } else {
-        setStatus('âŒ Not connected'); setMyTurnUI(true)
+        setStatus('❌ Not connected'); setMyTurnUI(true)
       }
       return
     }
@@ -1015,7 +955,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
     }
   }
 
-  // â”€â”€â”€ MULTIPLAYER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── MULTIPLAYER ──────────────────────────────────────────────────────────
   function applyServerFen(newFen) {
     try { chessRef.current = new Chess(newFen); bump() }
     catch (e) { console.error('Bad FEN', e) }
@@ -1026,7 +966,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
     try {
       const res = await fetch(API + '/api/match/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-init-data': initData },
+        headers: { 'Content-Type': 'application/json', 'x-init-data': 'test' },
         body: JSON.stringify({ stake, currency })
       })
       const data = await res.json()
@@ -1038,71 +978,52 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
     setLoading(false)
   }
 
-  async function joinMatch(matchIdToJoin) {
-    const mid = matchIdToJoin || joinId.trim()
-    if (!mid) { setStatus('Enter match ID'); return }
+  async function joinMatch() {
+    if (!joinId.trim()) { setStatus('Enter match ID'); return }
     setLoading(true)
     try {
-      const res = await fetch(API + '/api/match/' + mid + '/join', {
-        method: 'POST', headers: { 'x-init-data': initData }
+      const res = await fetch(API + '/api/match/' + joinId.trim() + '/join', {
+        method: 'POST', headers: { 'x-init-data': 'test' }
       })
       const data = await res.json()
       if (!res.ok) throw new Error(JSON.stringify(data))
       colorRef.current = 'black'; setColor('black')
-      setScreen('game'); connect(mid, 'black')
+      setScreen('game'); connect(joinId.trim(), 'black')
     } catch (e) { setStatus('Error: ' + e.message) }
     setLoading(false)
   }
 
-// â”€â”€â”€ MATCHMAKING QUEUE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  async function findMatch() {
-    // First, try to join an existing open match that matches our stake/currency
-    try {
-      const res = await fetch(API + '/api/matches/open', { headers: { 'x-init-data': initData } })
-      if (res.ok) {
-        const matches = await res.json()
-        const compatible = matches.filter(m => 
-          m.stake === stake && m.currency === currency.toUpperCase()
-        )
-        if (compatible.length > 0) {
-          // Join a random compatible match
-          const pick = compatible[Math.floor(Math.random() * compatible.length)]
-          setStatus('âš¡ Found a match! Joining...')
-          await joinMatch(pick.match_id)
-          return
-        }
-      }
-    } catch {}
-
-    // Fallback: join the WebSocket matchmaking queue
-    setInQueue(true); setQueueSeconds(0); setStatus('ðŸ” Finding opponent...')
+// ─── MATCHMAKING QUEUE ────────────────────────────────────────────────────
+  function findMatch() {
+    setInQueue(true); setQueueSeconds(0); setStatus('🔍 Finding opponent...')
     setScreen('queue')
 
-    // Timer â€” counts seconds while searching
+    // Timer — counts seconds while searching
     queueTimerRef.current = setInterval(() => setQueueSeconds(s => s + 1), 1000)
 
-    // WebSocket to matchmaking endpoint â€” server notifies when paired
+    const initData = tg?.initData || 'test'
+    // WebSocket to matchmaking endpoint — server notifies when paired
     const ws = new WebSocket(`${WSS}/ws/queue/${stake}/${currency.toUpperCase()}?init=${encodeURIComponent(initData)}`)
     queueWsRef.current = ws
 
     ws.onmessage = (evt) => {
       const msg = JSON.parse(evt.data)
       if (msg.type === 'matched') {
-        // Server found us an opponent â€” jump straight into the game
+        // Server found us an opponent — jump straight into the game
         clearInterval(queueTimerRef.current)
         setInQueue(false)
         colorRef.current = msg.color; setColor(msg.color)
         setMatchId(msg.match_id)
         setScreen('game')
         connect(msg.match_id, msg.color)
-        setStatus(msg.color === 'white' ? 'âš¡ï¸ Your turn!' : 'â³ Opponent goes first...')
+        setStatus(msg.color === 'white' ? '⚡️ Your turn!' : '⏳ Opponent goes first...')
       }
       if (msg.type === 'waiting') {
-        setStatus(`ðŸ” Searching... ${msg.in_queue} player(s) in queue`)
+        setStatus(`🔍 Searching... ${msg.in_queue} player(s) in queue`)
       }
       if (msg.type === 'timeout') {
         cancelQueue()
-        setStatus('â± No opponent found. Try again.')
+        setStatus('⏱ No opponent found. Try again.')
         setScreen('home')
       }
     }
@@ -1110,7 +1031,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
       if (inQueue) { cancelQueue(); setScreen('home') }
     }
     ws.onerror = () => {
-      cancelQueue(); setStatus('âŒ Queue error. Try again.'); setScreen('home')
+      cancelQueue(); setStatus('❌ Queue error. Try again.'); setScreen('home')
     }
   }
 
@@ -1123,7 +1044,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
   function connect(mid, clr) {
     const sock = new WebSocket(WSS + '/ws/' + mid + '/' + clr)
     wsRef.current = sock
-    sock.onopen = () => setStatus(clr === 'white' ? 'â³ Waiting for opponent...' : 'âš¡ï¸ Game on!')
+    sock.onopen = () => setStatus(clr === 'white' ? '⏳ Waiting for opponent...' : '⚡️ Game on!')
     sock.onmessage = (evt) => {
       const msg = JSON.parse(evt.data)
       const myClr = colorRef.current
@@ -1131,7 +1052,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         applyServerFen(msg.fen); setScreen('game')
         const mine = msg.turn === myClr
         setMyTurnUI(mine)
-        setStatus(mine ? 'âš¡ï¸ Your turn!' : 'â³ Waiting for opponent...')
+        setStatus(mine ? '⚡️ Your turn!' : '⏳ Waiting for opponent...')
         return
       }
       if (msg.type === 'state') {
@@ -1141,7 +1062,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         const mine = msg.turn === myClr
         setMyTurnUI(mine && !msg.game_over)
         if (msg.game_over && msg.result) endMultiGame(msg.result, myClr)
-        else setStatus(mine ? 'âš¡ï¸ Your turn!' : 'â³ Opponent thinking...')
+        else setStatus(mine ? '⚡️ Your turn!' : '⏳ Opponent thinking...')
         return
       }
       if (msg.type === 'error') {
@@ -1149,21 +1070,21 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         setSelectedSq(null); setLegalTargets([])
         const mine = msg.turn ? msg.turn === myClr : myTurnUI
         setMyTurnUI(mine)
-        setStatus('âš ï¸ ' + (msg.msg || 'Move rejected'))
+        setStatus('⚠️ ' + (msg.msg || 'Move rejected'))
         return
       }
       if (msg.type === 'gameover') endMultiGame(msg, myClr)
     }
-    sock.onclose = () => setStatus('ðŸ”Œ Disconnected')
-    sock.onerror = () => setStatus('âŒ Connection error')
+    sock.onclose = () => setStatus('🔌 Disconnected')
+    sock.onerror = () => setStatus('❌ Connection error')
   }
 
   function endMultiGame(r, clr) {
     setMyTurnUI(false); setResult(r)
     setSelectedSq(null); setLegalTargets([])
-    if (!r.winner) setStatus('Â½ Draw!')
-    else if (r.winner === clr) setStatus(`ðŸ† YOU WIN! +${cfg.symbol}${(stake * 2 * 0.9).toFixed(cfg.decimals)} ${cfg.unit}`)
-    else setStatus('ðŸ’€ You lost.')
+    if (!r.winner) setStatus('½ Draw!')
+    else if (r.winner === clr) setStatus(`🏆 YOU WIN! +${cfg.symbol}${(stake * 2 * 0.9).toFixed(cfg.decimals)} ${cfg.unit}`)
+    else setStatus('💀 You lost.')
   }
 
   function reset() {
@@ -1181,9 +1102,9 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
   const pool = stake * 2, win = pool * 0.9, fee = pool * 0.1
   const isBot = mode === 'computer'
 
-  // â”€â”€â”€ CHECK HIGHLIGHTING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── CHECK HIGHLIGHTING ───────────────────────────────────────────────────
   // Find the king square of whoever is in check, so ChessBoard can flash it red.
-  // Derived from chessRef â€” safe read-only, no mutations.
+  // Derived from chessRef — safe read-only, no mutations.
   function getCheckedKingSq() {
     const chess = chessRef.current
     if (!chess.isCheck()) return null
@@ -1199,33 +1120,33 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
   }
   const checkedKingSq = (screen === 'game') ? getCheckedKingSq() : null
 
-  // â”€â”€â”€ DYNAMIC NOTIFICATION BANNERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  let notificationText = 'ðŸ‘‰ Step 1: Choose who you want to play with below!'
+  // ─── DYNAMIC NOTIFICATION BANNERS ──────────────────────────────────────────
+  let notificationText = '👉 Step 1: Choose who you want to play with below!'
   let notificationClass = 'text-amber-400 bg-amber-500/10 border-amber-500/20'
 
-  if (status && (status.startsWith('âš ï¸') || status.startsWith('âŒ'))) {
+  if (status && (status.startsWith('⚠️') || status.startsWith('❌'))) {
     notificationText = status
     notificationClass = 'text-red-400 bg-red-500/10 border-red-500/30 font-black shadow-[0_0_15px_rgba(239,68,68,0.15)]'
   } else if (currentStep === 0) {
-    notificationText = 'ðŸ‘‰ Step 1: Choose who you want to play with below!'
+    notificationText = '👉 Step 1: Choose who you want to play with below!'
     notificationClass = 'text-amber-400 bg-amber-500/10 border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.05)]'
   } else if (currentStep === 1) {
     if (mode === 'computer') {
-      notificationText = "ðŸ‘‰ Step 2: Betting unavailable vs AI. Tap 'Play For Free' to continue!"
+      notificationText = "👉 Step 2: Betting unavailable vs AI. Tap 'Play For Free' to continue!"
       notificationClass = 'text-blue-400 bg-blue-500/10 border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]'
     } else {
-      notificationText = "ðŸ‘‰ Step 2: Choose 'Play With Bet' or 'Play For Free'!"
+      notificationText = "👉 Step 2: Choose 'Play With Bet' or 'Play For Free'!"
       notificationClass = 'text-purple-400 bg-purple-500/10 border-purple-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]'
     }
   } else if (currentStep === 2) {
     const modeLabel = mode === 'computer' ? 'VS AI' : 'VS HUMAN'
     const stakeLabel = stake === 0 ? 'FREE' : `${cfg.symbol}${stake}`
     const promptTarget = mode === 'computer' ? 'an AI Difficulty Level' : 'Find/Create Match'
-    notificationText = `âœ… Setup Ready (${modeLabel} - ${stakeLabel})! Now choose ${promptTarget} below.`
+    notificationText = `✅ Setup Ready (${modeLabel} - ${stakeLabel})! Now choose ${promptTarget} below.`
     notificationClass = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
   }
 
-  // â”€â”€â”€ RENDERING HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── RENDERING HELPERS ─────────────────────────────────────────────────────
   function renderHome() {
     return (
       <main className="p-3 space-y-4 flex-grow overflow-y-auto no-scrollbar">
@@ -1233,30 +1154,30 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         <div className="space-y-1">
           <div className="grid grid-cols-4 gap-1.5 text-[10px] text-center font-semibold">
             <div 
-              onClick={() => setScreen('profile')} 
+              onPointerDown={() => setScreen('profile')} 
               className="bg-[#140b29] border border-[#231742] py-2 rounded-xl flex flex-col items-center justify-center gap-0.5 hover:border-purple-500/40 transition cursor-pointer"
             >
-              <span className="text-purple-400 text-sm drop-shadow-[0_0_5px_rgba(168,85,247,0.4)]">ðŸ‘¤+</span>
+              <span className="text-purple-400 text-sm drop-shadow-[0_0_5px_rgba(168,85,247,0.4)]">👤+</span>
               <span className="text-gray-300 text-[9px]">Profile</span>
             </div>
             <div className="bg-[#140b29] border border-[#231742] py-2 rounded-xl flex flex-col items-center justify-center">
-              <span className="text-emerald-400 text-[11px] drop-shadow-[0_0_5px_rgba(52,211,153,0.3)]">ðŸ–¨ï¸ Balance</span>
+              <span className="text-emerald-400 text-[11px] drop-shadow-[0_0_5px_rgba(52,211,153,0.3)]">🖨️ Balance</span>
               <span className="text-[#26d07c] font-black text-[9px]">
                 {userBalance !== null ? `$${userBalance.toFixed(2)}` : '$0.00'}
               </span>
             </div>
             <div 
-              onClick={() => { helpFromRef.current = 'home'; setScreen('help') }}
+              onPointerDown={() => { helpFromRef.current = 'home'; setScreen('help') }}
               className="bg-[#140b29] border border-[#231742] py-2 rounded-xl flex flex-col items-center justify-center gap-0.5 hover:border-purple-500/40 transition cursor-pointer"
             >
-              <span className="text-purple-400 text-sm drop-shadow-[0_0_5px_rgba(168,85,247,0.4)]">ðŸŽ</span>
+              <span className="text-purple-400 text-sm drop-shadow-[0_0_5px_rgba(168,85,247,0.4)]">🎁</span>
               <span className="text-gray-300 text-[9px]">Promotions</span>
             </div>
             <div 
-              onClick={() => alert('Invite Friends: Coming Soon!')} 
+              onPointerDown={() => alert('Invite Friends: Coming Soon!')} 
               className="bg-[#140b29] border border-[#231742] py-2 rounded-xl flex flex-col items-center justify-center gap-0.5 hover:border-purple-500/40 transition cursor-pointer"
             >
-              <span className="text-purple-400 text-sm drop-shadow-[0_0_5px_rgba(168,85,247,0.4)]">ðŸ‘¥+</span>
+              <span className="text-purple-400 text-sm drop-shadow-[0_0_5px_rgba(168,85,247,0.4)]">👥+</span>
               <span className="text-gray-300 text-[9px]">Invite Friends</span>
             </div>
           </div>
@@ -1271,7 +1192,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
             CHESS ARENA
           </h1>
           <p className="text-[10px] uppercase font-bold tracking-widest text-purple-300 mt-1 flex items-center gap-2">
-            Play <span className="text-purple-500 text-xs shadow-sm">â€¢</span> Compete <span className="text-purple-500 text-xs">â€¢</span> Win
+            Play <span className="text-purple-500 text-xs shadow-sm">•</span> Compete <span className="text-purple-500 text-xs">•</span> Win
           </p>
 
           <div className="mt-4 w-full bg-[#1b0e38]/80 border border-purple-500/30 rounded-xl py-2 px-3.5 text-left flex items-center justify-between gap-2 shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
@@ -1279,7 +1200,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
               <span className="text-[9px] font-black uppercase bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(245,158,11,0.5)] mr-1.5 inline-block">PROMO</span>
               <span className="text-[11px] text-purple-100 font-semibold tracking-wide">Earn double tokens on matches today!</span>
             </div>
-            <span className="text-amber-400 text-xs shrink-0 drop-shadow-[0_0_4px_rgba(245,158,11,0.5)]">âš¡</span>
+            <span className="text-amber-400 text-xs shrink-0 drop-shadow-[0_0_4px_rgba(245,158,11,0.5)]">⚡</span>
           </div>
         </section>
 
@@ -1293,27 +1214,27 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
           <label className="text-[9px] font-black tracking-widest text-purple-400/80 uppercase block">1. Select Mode</label>
           <div className="grid grid-cols-2 gap-3">
             <div 
-              onClick={() => handleSelectMode('computer')} 
+              onPointerDown={() => handleSelectMode('computer')} 
               className={`rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition duration-200 ${
                 mode === 'computer' 
                   ? "bg-[#130d2d] border-2 border-blue-500 bg-blue-950/20 shadow-[0_0_15px_rgba(59,130,246,0.35)]" 
                   : "bg-[#110924] border border-[#26184a] shadow-lg hover:border-blue-500/30"
               }`}
             >
-              <div className="w-11 h-11 mb-2 bg-gradient-to-b from-blue-500/15 to-transparent rounded-full flex items-center justify-center text-2xl drop-shadow-[0_0_8px_rgba(59,130,246,0.3)]">ðŸ¤–</div>
+              <div className="w-11 h-11 mb-2 bg-gradient-to-b from-blue-500/15 to-transparent rounded-full flex items-center justify-center text-2xl drop-shadow-[0_0_8px_rgba(59,130,246,0.3)]">🤖</div>
               <h3 className="font-black text-sm tracking-wide text-gray-200">VS AI</h3>
               <p className="text-[10px] text-gray-500 mt-0.5">Practice Mode</p>
             </div>
 
             <div 
-              onClick={() => handleSelectMode('human')} 
+              onPointerDown={() => handleSelectMode('human')} 
               className={`rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition duration-200 ${
                 mode === 'human' 
                   ? "bg-[#190d33] border-2 border-purple-500 bg-purple-950/20 shadow-[0_0_15px_rgba(16,185,129,0.35)]" 
                   : "bg-[#110924] border border-[#26184a] shadow-lg hover:border-purple-500/30"
               }`}
             >
-              <div className="w-11 h-11 mb-2 bg-gradient-to-b from-purple-500/15 to-transparent rounded-full flex items-center justify-center text-xl drop-shadow-[0_0_8px_rgba(168,85,247,0.3)]">âš”ï¸</div>
+              <div className="w-11 h-11 mb-2 bg-gradient-to-b from-purple-500/15 to-transparent rounded-full flex items-center justify-center text-xl drop-shadow-[0_0_8px_rgba(168,85,247,0.3)]">⚔️</div>
               <h3 className="font-black text-sm tracking-wide text-gray-200">VS HUMAN</h3>
               <p className="text-[10px] text-gray-500 mt-0.5">Online Mode</p>
             </div>
@@ -1325,12 +1246,12 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
           <label className="text-[9px] font-black tracking-widest text-purple-400/80 uppercase block">2. Select Entry Style</label>
           <div className="space-y-2">
             <button 
-              onClick={() => handleSelectStyle('bet')} 
+              onPointerDown={() => handleSelectStyle('bet')} 
               className={`w-full bg-gradient-to-r from-[#8a6207] via-[#e6b82e] to-[#8a6207] text-slate-950 font-black text-xs py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-[0_4px_15px_rgba(230,184,46,0.25)] transition tracking-wider uppercase border border-yellow-400/30 ${
                 mode === 'computer' ? 'opacity-40 cursor-not-allowed' : ''
               }`}
             >
-              ðŸª™ Play With Bet <span className={`text-[10px] inline-block transition-transform duration-200 ${betPanelOpen ? 'rotate-90' : ''}`}>â¯</span>
+              🪙 Play With Bet <span className={`text-[10px] inline-block transition-transform duration-200 ${betPanelOpen ? 'rotate-90' : ''}`}>❯</span>
             </button>
 
             {/* Bet Panel */}
@@ -1340,7 +1261,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
                   {Object.entries(CURRENCY_CONFIG).map(([key, c]) => (
                     <button 
                       key={key} 
-                      onClick={() => { setCurrency(key); setStake(c.stakes[1]); setCurrentStep(1); }}
+                      onPointerDown={() => { setCurrency(key); setStake(c.stakes[1]); setCurrentStep(1); }}
                       className={`py-2 rounded-lg flex items-center justify-center gap-1.5 transition ${
                         currency === key 
                           ? `bg-[#0f0921] border-2 border-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.2)]` 
@@ -1358,7 +1279,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
                   {cfg.stakes.filter(s => s > 0).map(s => (
                     <button 
                       key={s} 
-                      onClick={() => handleConfirmStake(s)} 
+                      onPointerDown={() => handleConfirmStake(s)} 
                       className={`py-2 rounded transition ${
                         stake === s 
                           ? "bg-emerald-600 border border-emerald-400 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)] font-black" 
@@ -1373,12 +1294,12 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
             </section>
 
             <button 
-              onClick={() => handleSelectStyle('free')} 
+              onPointerDown={() => handleSelectStyle('free')} 
               className={`w-full bg-gradient-to-r from-[#391363] to-[#5c209e] border border-purple-500/50 text-purple-100 font-black text-xs py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-lg uppercase tracking-wider ${
                 stake === 0 && currentStep >= 2 ? 'border-2 border-purple-400 bg-purple-900/40' : ''
               }`}
             >
-              ðŸŽ® Play For Free
+              🎮 Play For Free
             </button>
           </div>
         </div>
@@ -1390,34 +1311,34 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
           {mode === 'human' ? (
             <div className="grid grid-cols-2 gap-2">
               <button 
-                onClick={() => {
+                onPointerDown={() => {
                   if (currentStep < 2) {
-                    setStatus('âš ï¸ Please choose Play With Bet or Play For Free first!')
+                    setStatus('⚠️ Please choose Play With Bet or Play For Free first!')
                     return
                   }
                   findMatch()
                 }} 
                 className="w-full bg-gradient-to-r from-[#059652] to-[#05a85c] text-white font-black text-xs py-3.5 rounded-xl flex items-center justify-center gap-1.5 shadow-[0_4px_12px_rgba(5,150,82,0.3)] hover:brightness-110 transition tracking-wider uppercase"
               >
-                ðŸ” Find Match
+                🔍 Find Match
               </button>
               <button 
-                onClick={() => {
+                onPointerDown={() => {
                   if (currentStep < 2) {
-                    setStatus('âš ï¸ Please choose Play With Bet or Play For Free first!')
+                    setStatus('⚠️ Please choose Play With Bet or Play For Free first!')
                     return
                   }
                   createMatch()
                 }} 
                 className="w-full bg-gradient-to-r from-[#5c1a9e] to-[#6d20bd] text-white font-black text-xs py-3.5 rounded-xl flex items-center justify-center gap-1.5 shadow-[0_4px_12px_rgba(92,26,158,0.3)] hover:brightness-110 transition tracking-wider uppercase"
               >
-                âš”ï¸ Create Match
+                ⚔️ Create Match
               </button>
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-2">
               <button 
-                onClick={() => {
+                onPointerDown={() => {
                   setDifficulty('easy')
                   setPlayerColor('white')
                   setCurrentStep(2)
@@ -1425,10 +1346,10 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
                 }} 
                 className="bg-gradient-to-b from-emerald-950/80 to-emerald-900/60 border border-emerald-500/50 text-emerald-300 font-black text-xs py-3.5 rounded-xl flex flex-col items-center justify-center transition tracking-wider uppercase shadow-[0_4px_10px_rgba(16,185,129,0.15)]"
               >
-                <span className="text-sm mb-0.5 drop-shadow-[0_0_5px_rgba(16,185,129,0.6)]">ðŸŸ¢</span> Beginner
+                <span className="text-sm mb-0.5 drop-shadow-[0_0_5px_rgba(16,185,129,0.6)]">🟢</span> Beginner
               </button>
               <button 
-                onClick={() => {
+                onPointerDown={() => {
                   setDifficulty('medium')
                   setPlayerColor('white')
                   setCurrentStep(2)
@@ -1436,10 +1357,10 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
                 }} 
                 className="bg-gradient-to-b from-amber-950/80 to-amber-900/60 border border-amber-500/50 text-amber-300 font-black text-xs py-3.5 rounded-xl flex flex-col items-center justify-center transition tracking-wider uppercase shadow-[0_4px_10px_rgba(245,158,11,0.15)]"
               >
-                <span className="text-sm mb-0.5 drop-shadow-[0_0_5px_rgba(245,158,11,0.6)]">ðŸŸ¡</span> Medium
+                <span className="text-sm mb-0.5 drop-shadow-[0_0_5px_rgba(245,158,11,0.6)]">🟡</span> Medium
               </button>
               <button 
-                onClick={() => {
+                onPointerDown={() => {
                   setDifficulty('hard')
                   setPlayerColor('white')
                   setCurrentStep(2)
@@ -1447,36 +1368,11 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
                 }} 
                 className="bg-gradient-to-b from-rose-950/80 to-rose-900/60 border border-rose-500/50 text-rose-300 font-black text-xs py-3.5 rounded-xl flex flex-col items-center justify-center transition tracking-wider uppercase shadow-[0_4px_10px_rgba(244,63,94,0.15)]"
               >
-                <span className="text-sm mb-0.5 drop-shadow-[0_0_5px_rgba(244,63,94,0.6)]">ðŸ”´</span> Hard
+                <span className="text-sm mb-0.5 drop-shadow-[0_0_5px_rgba(244,63,94,0.6)]">🔴</span> Hard
               </button>
             </div>
           )}
         </div>
-
-       {/* Open Matches List */}
-        {openMatches.length > 0 && (
-          <div className="space-y-1.5">
-            <label className="text-[9px] font-black tracking-widest text-purple-400/80 uppercase block">🟢 Available Matches</label>
-            <div className="space-y-2">
-              {openMatches.slice(0, 4).map(m => (
-                <div key={m.match_id} style={{ background: '#0d071f', border: '1px solid rgba(99,102,241,.2)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div>
-                    <div style={{ color: '#A5B4FC', fontWeight: 700, fontSize: '.8rem' }}>
-                      {m.stake === 0 ? '🆓 Free Game' : `${CURRENCY_CONFIG[m.currency]?.symbol || '$'}${m.stake} ${m.currency}`}
-                    </div>
-                    <div style={{ color: '#4B5563', fontSize: '.68rem', marginTop: 2 }}>by {m.creator_name || 'Player'}</div>
-                  </div>
-                  <button
-                    onClick={() => joinMatch(m.match_id)}
-                    style={{ background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', border: 'none', borderRadius: 8, padding: '7px 14px', color: '#fff', fontWeight: 800, fontSize: '.75rem', cursor: 'pointer' }}
-                  >
-                    Join ⚔️
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Divider */}
         <div className="relative flex items-center justify-center py-1">
@@ -1495,10 +1391,10 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
             className="bg-[#070312] border border-[#231742] rounded-lg px-3 py-2 text-xs flex-grow focus:outline-none focus:border-purple-500 text-gray-200 placeholder-gray-600 transition" 
           />
           <button 
-            onClick={() => joinMatch()} 
+            onPointerDown={joinMatch} 
             className="bg-gradient-to-r from-[#4d1991] to-[#5c20bd] text-white font-black text-xs py-2 px-3.5 rounded-lg whitespace-nowrap shadow-md"
           >
-            ðŸ”— Join Match
+            🔗 Join Match
           </button>
         </div>
 
@@ -1509,17 +1405,17 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
             <div className="flex-grow ml-3 border-t border-[#1f143d]"></div>
           </div>
           <div className="grid grid-cols-4 gap-2 text-[10px] font-black text-center">
-            <div onClick={() => alert('Ludo is Coming Soon!')} className="bg-[#110924] border border-[#231644] py-3.5 px-1 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-[#1a0e36] hover:border-purple-500/40 transition duration-150 shadow-md">
-              <span className="text-xl drop-shadow-[0_0_4px_rgba(245,158,11,0.3)]">ðŸŽ²</span> <span className="text-gray-300 tracking-wide">LUDO</span>
+            <div onPointerDown={() => alert('Ludo is Coming Soon!')} className="bg-[#110924] border border-[#231644] py-3.5 px-1 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-[#1a0e36] hover:border-purple-500/40 transition duration-150 shadow-md">
+              <span className="text-xl drop-shadow-[0_0_4px_rgba(245,158,11,0.3)]">🎲</span> <span className="text-gray-300 tracking-wide">LUDO</span>
             </div>
-            <div onClick={() => alert('Poker is Coming Soon!')} className="bg-[#110924] border border-[#231644] py-3.5 px-1 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-[#1a0e36] hover:border-purple-500/40 transition duration-150 shadow-md">
-              <span className="text-xl drop-shadow-[0_0_4px_rgba(239,68,68,0.3)]">ðŸƒ</span> <span className="text-gray-300 tracking-wide">POKER</span>
+            <div onPointerDown={() => alert('Poker is Coming Soon!')} className="bg-[#110924] border border-[#231644] py-3.5 px-1 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-[#1a0e36] hover:border-purple-500/40 transition duration-150 shadow-md">
+              <span className="text-xl drop-shadow-[0_0_4px_rgba(239,68,68,0.3)]">🃏</span> <span className="text-gray-300 tracking-wide">POKER</span>
             </div>
-            <div onClick={() => alert('FIFA is Coming Soon!')} className="bg-[#110924] border border-[#231644] py-3.5 px-1 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-[#1a0e36] hover:border-purple-500/40 transition duration-150 shadow-md">
-              <span className="text-xl drop-shadow-[0_0_4px_rgba(59,130,246,0.3)]">âš½</span> <span className="text-gray-300 tracking-wide">FIFA</span>
+            <div onPointerDown={() => alert('FIFA is Coming Soon!')} className="bg-[#110924] border border-[#231644] py-3.5 px-1 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-[#1a0e36] hover:border-purple-500/40 transition duration-150 shadow-md">
+              <span className="text-xl drop-shadow-[0_0_4px_rgba(59,130,246,0.3)]">⚽</span> <span className="text-gray-300 tracking-wide">FIFA</span>
             </div>
-            <div onClick={() => alert('More Games Coming Soon!')} className="bg-[#110924] border border-[#231644] py-3.5 px-1 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-[#1a0e36] hover:border-purple-500/40 transition duration-150 shadow-md">
-              <span className="text-xl drop-shadow-[0_0_4px_rgba(168,85,247,0.3)]">ðŸŽ¯</span> <span className="text-purple-400 text-[8px] leading-tight font-black uppercase">MORE</span>
+            <div onPointerDown={() => alert('More Games Coming Soon!')} className="bg-[#110924] border border-[#231644] py-3.5 px-1 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-[#1a0e36] hover:border-purple-500/40 transition duration-150 shadow-md">
+              <span className="text-xl drop-shadow-[0_0_4px_rgba(168,85,247,0.3)]">🎯</span> <span className="text-purple-400 text-[8px] leading-tight font-black uppercase">MORE</span>
             </div>
           </div>
         </section>
@@ -1532,24 +1428,24 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
           </div>
           <div className="grid grid-cols-3 gap-2 text-xs font-semibold">
             <div className="bg-[#110924] border border-[#26174a] p-2.5 rounded-xl flex items-center gap-2 shadow-md">
-              <span className="text-base drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]">ðŸ¥‡</span>
-              <div className="w-6 h-6 rounded-full bg-purple-950/80 border border-purple-500/40 flex items-center justify-center text-[10px]">ðŸ‘¤</div>
+              <span className="text-base drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]">🥇</span>
+              <div className="w-6 h-6 rounded-full bg-purple-950/80 border border-purple-500/40 flex items-center justify-center text-[10px]">👤</div>
               <div>
                 <p className="text-[10px] font-bold text-white truncate max-w-[55px]">PlayerA</p>
                 <p className="text-[9px] text-amber-400 font-black tracking-wide">2500 ELO</p>
               </div>
             </div>
             <div className="bg-[#110924] border border-[#26174a] p-2.5 rounded-xl flex items-center gap-2 shadow-md">
-              <span className="text-base drop-shadow-[0_0_5px_rgba(148,163,184,0.5)]">ðŸ¥ˆ</span>
-              <div className="w-6 h-6 rounded-full bg-purple-950/80 border border-purple-500/40 flex items-center justify-center text-[10px]">ðŸ‘¤</div>
+              <span className="text-base drop-shadow-[0_0_5px_rgba(148,163,184,0.5)]">🥈</span>
+              <div className="w-6 h-6 rounded-full bg-purple-950/80 border border-purple-500/40 flex items-center justify-center text-[10px]">👤</div>
               <div>
                 <p className="text-[10px] font-bold text-white truncate max-w-[55px]">PlayerB</p>
                 <p className="text-[9px] text-amber-400 font-black tracking-wide">2400 ELO</p>
               </div>
             </div>
             <div className="bg-[#110924] border border-[#26174a] p-2.5 rounded-xl flex items-center gap-2 shadow-md">
-              <span className="text-base drop-shadow-[0_0_5px_rgba(180,83,9,0.5)]">ðŸ¥‰</span>
-              <div className="w-6 h-6 rounded-full bg-purple-950/80 border border-purple-500/40 flex items-center justify-center text-[10px]">ðŸ‘¤</div>
+              <span className="text-base drop-shadow-[0_0_5px_rgba(180,83,9,0.5)]">🥉</span>
+              <div className="w-6 h-6 rounded-full bg-purple-950/80 border border-purple-500/40 flex items-center justify-center text-[10px]">👤</div>
               <div>
                 <p className="text-[10px] font-bold text-white truncate max-w-[55px]">PlayerC</p>
                 <p className="text-[9px] text-amber-400 font-black tracking-wide">2300 ELO</p>
@@ -1582,7 +1478,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
       <div className="flex-1 flex flex-col justify-between h-full bg-[#080B14]">
         {/* Header */}
         <header className="px-4 pt-3 pb-2 bg-[#0e071f] flex justify-between items-center border-b border-[#1b1233] shrink-0 z-50">
-          <button onClick={() => setScreen(helpFromRef.current)} className="text-gray-400 hover:text-white transition">
+          <button onPointerDown={() => setScreen(helpFromRef.current)} className="text-gray-400 hover:text-white transition">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
           </button>
           <div className="font-bold text-base tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-purple-300">Help & Rules</div>
@@ -1591,37 +1487,37 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
 
         {/* Scrollable content */}
         <main className="p-3 space-y-4 flex-grow overflow-y-auto no-scrollbar pb-8">
-          <Section title="â™Ÿ HOW TO PLAY">
+          <Section title="♟ HOW TO PLAY">
             <P>Tap any of your pieces to select it. Legal moves appear as dots on the board. Tap a dot to move there. Tap a different piece to switch selection.</P>
-            <P>Capture squares show a ring around the enemy piece. The goal is to checkmate the opponent's king â€” trap it so it cannot escape.</P>
+            <P>Capture squares show a ring around the enemy piece. The goal is to checkmate the opponent's king — trap it so it cannot escape.</P>
           </Section>
 
-          <Section title="ðŸŽ¨ BOARD COLOURS">
-            <Row label="ðŸŸ¨ Yellow / Brown" value="Normal squares" />
-            <Row label="ðŸŸ© Green" value="Last move (from â†’ to)" colorClass="text-lime-400" />
-            <Row label="ðŸŸª Purple" value="Selected piece" colorClass="text-indigo-400" />
-            <Row label="ðŸ”´ Red" value="King in check" colorClass="text-rose-500" />
-            <Row label="âšª White dot" value="Legal move target" />
-            <Row label="ðŸŸ¢ Green dot" value="Legal move (Easy mode hint)" colorClass="text-emerald-400" />
+          <Section title="🎨 BOARD COLOURS">
+            <Row label="🟨 Yellow / Brown" value="Normal squares" />
+            <Row label="🟩 Green" value="Last move (from → to)" colorClass="text-lime-400" />
+            <Row label="🟪 Purple" value="Selected piece" colorClass="text-indigo-400" />
+            <Row label="🔴 Red" value="King in check" colorClass="text-rose-500" />
+            <Row label="⚪ White dot" value="Legal move target" />
+            <Row label="🟢 Green dot" value="Legal move (Easy mode hint)" colorClass="text-emerald-400" />
           </Section>
 
-          <Section title="â™Ÿ PIECE VALUES">
-            <Row label="â™™ Pawn"   value="1 point" />
-            <Row label="â™˜ Knight" value="3 points" />
-            <Row label="â™— Bishop" value="3 points" />
-            <Row label="â™– Rook"   value="5 points" />
-            <Row label="â™• Queen"  value="9 points" />
-            <Row label="â™” King"   value="âˆž â€” protect at all costs" colorClass="text-rose-500" />
+          <Section title="♟ PIECE VALUES">
+            <Row label="♙ Pawn"   value="1 point" />
+            <Row label="♘ Knight" value="3 points" />
+            <Row label="♗ Bishop" value="3 points" />
+            <Row label="♖ Rook"   value="5 points" />
+            <Row label="♕ Queen"  value="9 points" />
+            <Row label="♔ King"   value="∞ — protect at all costs" colorClass="text-rose-500" />
           </Section>
 
-          <Section title="ðŸ’° CURRENCIES">
+          <Section title="💰 CURRENCIES">
             {Object.entries(CURRENCY_CONFIG).map(([key, c]) => (
-              <Row key={key} label={`${c.icon} ${key}`} value={c.description.split('â€”')[0].trim()} colorClass="text-indigo-300" />
+              <Row key={key} label={`${c.icon} ${key}`} value={c.description.split('—')[0].trim()} colorClass="text-indigo-300" />
             ))}
             <P className="mt-2">All balances are held in a secure escrow on the server. Stakes are locked the moment both players join. You are never charged unless a complete match is played.</P>
           </Section>
 
-          <Section title="ðŸ† PRIZE STRUCTURE">
+          <Section title="🏆 PRIZE STRUCTURE">
             <P>When you win a match:</P>
             <Row label="Your stake" value="Returned" colorClass="text-emerald-400" />
             <Row label="Opponent's stake" value="90% to you" colorClass="text-emerald-400" />
@@ -1629,20 +1525,20 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
             <P>On a draw, both players receive their original stake back. No rake is charged on draws.</P>
           </Section>
 
-          <Section title="ðŸ¤– VS COMPUTER MODES">
-            <Row label="ðŸŸ¢ Easy"   value="Random legal moves â€” perfect for beginners" />
-            <Row label="ðŸŸ¡ Medium" value="2-ply minimax â€” plays solid, won't blunder big pieces" />
-            <Row label="ðŸ”´ Hard"   value="3-ply minimax + alpha-beta â€” tactical, punishes mistakes" />
-            <P>Computer moves are computed locally on your device â€” no internet needed, instant response.</P>
+          <Section title="🤖 VS COMPUTER MODES">
+            <Row label="🟢 Easy"   value="Random legal moves — perfect for beginners" />
+            <Row label="🟡 Medium" value="2-ply minimax — plays solid, won't blunder big pieces" />
+            <Row label="🔴 Hard"   value="3-ply minimax + alpha-beta — tactical, punishes mistakes" />
+            <P>Computer moves are computed locally on your device — no internet needed, instant response.</P>
           </Section>
 
-          <Section title="ðŸ”’ SECURITY">
-            <P>Your Telegram identity is verified with HMAC-SHA256 on every request. Stakes are validated server-side â€” the frontend never controls financial logic. All payouts are atomic â€” a match can only be settled once.</P>
+          <Section title="🔒 SECURITY">
+            <P>Your Telegram identity is verified with HMAC-SHA256 on every request. Stakes are validated server-side — the frontend never controls financial logic. All payouts are atomic — a match can only be settled once.</P>
             <P>If you disconnect mid-game, your opponent wins automatically. If both players disconnect simultaneously, stakes are refunded.</P>
           </Section>
 
-          <button onClick={() => setScreen(helpFromRef.current)} className="w-full bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white font-black text-xs py-3.5 rounded-xl uppercase tracking-wider shadow-lg">
-            â† Back to Game
+          <button onPointerDown={() => setScreen(helpFromRef.current)} className="w-full bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white font-black text-xs py-3.5 rounded-xl uppercase tracking-wider shadow-lg">
+            ← Back to Game
           </button>
         </main>
       </div>
@@ -1652,7 +1548,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
   function renderQueue() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-5 space-y-6 h-full bg-[#0a0516]">
-        <div className="text-6xl animate-pulse">â™Ÿ</div>
+        <div className="text-6xl animate-pulse">♟</div>
         <h2 className="font-black text-xl text-purple-400 tracking-wide">Finding Opponent</h2>
         <p className="text-gray-500 text-xs">
           {cfg.icon} {cfg.symbol}{stake} {cfg.unit} stake
@@ -1666,7 +1562,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         </div>
 
         <div className="text-gray-400 text-xs text-center max-w-[260px] leading-relaxed">
-          {status || 'ðŸ” Matching you with a player at the same stake...'}
+          {status || '🔍 Matching you with a player at the same stake...'}
         </div>
 
         <div className="flex gap-5 bg-[#111827] border border-white/5 rounded-xl py-3 px-6 shadow-inner">
@@ -1682,10 +1578,10 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         </div>
 
         <button 
-          onClick={() => { cancelQueue(); setScreen('home') }}
+          onPointerDown={() => { cancelQueue(); setScreen('home') }}
           className="bg-transparent border border-gray-800 text-gray-500 hover:text-white px-8 py-3 rounded-xl font-bold text-sm tracking-wider transition"
         >
-          âœ• Cancel Search
+          ✕ Cancel Search
         </button>
       </div>
     )
@@ -1694,7 +1590,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
   function renderLobby() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-5 space-y-6 h-full bg-[#0a0516]">
-        <div className="text-5xl">âš”ï¸</div>
+        <div className="text-5xl">⚔️</div>
         <h2 className="font-black text-xl text-purple-400 tracking-wide">Match Created!</h2>
         <p className="text-gray-500 text-xs">Share this ID with your opponent</p>
 
@@ -1704,21 +1600,21 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
             {matchId}
           </div>
           <button 
-            onClick={() => { navigator.clipboard.writeText(matchId); setStatus('âœ… Copied!') }}
+            onPointerDown={() => { navigator.clipboard.writeText(matchId); setStatus('✅ Copied!') }}
             className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold text-xs py-3 rounded-lg mt-2 shadow-md uppercase tracking-wider"
           >
-            ðŸ“‹ Copy Match ID
+            📋 Copy Match ID
           </button>
         </div>
 
-        <div className="text-gray-400 text-xs animate-pulse">â³ Waiting for opponent...</div>
+        <div className="text-gray-400 text-xs animate-pulse">⏳ Waiting for opponent...</div>
         {status && <div className="text-emerald-400 text-xs font-semibold">{status}</div>}
 
         <button 
-          onClick={reset} 
+          onPointerDown={reset} 
           className="bg-transparent border border-gray-800 text-gray-500 hover:text-white px-8 py-3 rounded-xl font-bold text-xs tracking-wider transition uppercase"
         >
-          â† Cancel
+          ← Cancel
         </button>
       </div>
     )
@@ -1736,11 +1632,11 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         {/* Header */}
         <div className="flex justify-between items-center w-full">
           <div>
-            <div className="font-black text-sm text-purple-400 tracking-wide">â™Ÿ CHESS ARENA</div>
+            <div className="font-black text-sm text-purple-400 tracking-wide">♟ CHESS ARENA</div>
             <div className="text-gray-500 text-[10px]">
               {isBot
-                ? <>You play <strong className="text-indigo-300">{playerColor}</strong> Â· {difficulty}</>
-                : <>You are <strong className="text-indigo-300">{color}</strong> Â· {cfg.symbol}{stake} stake</>
+                ? <>You play <strong className="text-indigo-300">{playerColor}</strong> · {difficulty}</>
+                : <>You are <strong className="text-indigo-300">{color}</strong> · {cfg.symbol}{stake} stake</>
               }
             </div>
           </div>
@@ -1751,13 +1647,13 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
               ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400' 
               : 'bg-indigo-500/10 border-indigo-500/40 text-indigo-400'
           }`}>
-            {botThinking ? 'ðŸ¤– Thinking' : humanTurn ? 'âš¡ï¸ Your turn' : 'â³ Waiting'}
+            {botThinking ? '🤖 Thinking' : humanTurn ? '⚡️ Your turn' : '⏳ Waiting'}
           </div>
         </div>
 
         {/* Status Bar */}
         <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl py-2.5 px-4 text-center text-xs font-semibold text-indigo-300 w-full shadow-inner">
-          {status || 'â™Ÿ Game in progress'}
+          {status || '♟ Game in progress'}
         </div>
 
         {/* Custom Chessboard Container */}
@@ -1779,7 +1675,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         {/* Easy mode hints */}
         {showHints && humanTurn && !gameOver && (
           <div className="text-emerald-400 text-[10px] text-center font-bold tracking-wide animate-pulse">
-            ðŸ’¡ Tap any piece to see where it can move
+            💡 Tap any piece to see where it can move
           </div>
         )}
 
@@ -1817,155 +1713,45 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         <div className="flex gap-2.5 w-full">
           {(result || gameOver) && (
             <button 
-              onClick={isBot ? startVsComputer : reset}
+              onPointerDown={isBot ? startVsComputer : reset}
               className="flex-1 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white font-black text-xs py-3.5 rounded-xl uppercase tracking-wider shadow-lg transition"
             >
-              ðŸ”„ Play Again
+              🔄 Play Again
             </button>
           )}
           <button 
-            onClick={reset}
+            onPointerDown={reset}
             className={`py-3.5 rounded-xl font-black text-xs tracking-wider transition uppercase border border-gray-800 text-gray-500 hover:text-white ${
               result || gameOver ? 'px-5' : 'flex-grow'
             }`}
           >
-            â† Home
+            ← Home
           </button>
         </div>
       </div>
     )
   }
 
-  // ─── GAME OVER OVERLAY ────────────────────────────────────────────────────
-  const WIN_QUOTES = [
-    "You're a chess GENIUS! 🧠",
-    "Absolutely LEGENDARY move! 👑",
-    "The opponent never saw it coming! ⚡",
-    "Checkmate master! You crushed it! 💪",
-    "Flawless victory! Pure brilliance! 🌟",
-  ]
-  const LOSE_QUOTES = [
-    "Even Magnus Carlsen lost games. Keep going! 😤",
-    "The bot says: 'Better luck next time, human!' 🤖",
-    "That was... rough. Train harder! 📚",
-    "My grandmother plays better chess! 👵 (just kidding, try again!)",
-    "Defeat is the best teacher. Study that game! 🔍",
-  ]
-
   // ─── CONSOLIDATED RENDER ───────────────────────────────────────────────────
   return (
     <div className="text-white flex justify-center items-center min-h-screen p-0 sm:p-4 bg-[#03010a] font-sans">
-      {/* ── Bot Game Over Overlay ── */}
-      {showGameOverlay && isBot && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ background: gameOverOutcome === 'win' ? 'linear-gradient(135deg,#0d2918,#0a2010)' : gameOverOutcome === 'loss' ? 'linear-gradient(135deg,#2a0a0a,#1a0505)' : 'linear-gradient(135deg,#111827,#0d1117)', border: `1px solid ${gameOverOutcome === 'win' ? 'rgba(16,185,129,.4)' : gameOverOutcome === 'loss' ? 'rgba(239,68,68,.4)' : 'rgba(99,102,241,.3)'}`, borderRadius: 20, padding: 28, width: '100%', maxWidth: 340, textAlign: 'center', boxShadow: gameOverOutcome === 'win' ? '0 0 40px rgba(16,185,129,.25)' : '0 0 40px rgba(239,68,68,.2)' }}>
-            {gameOverOutcome === 'win' && (
-              <>
-                <div style={{ fontSize: 52, marginBottom: 8, animation: 'pulse 1s infinite' }}>🏆</div>
-                <div style={{ fontWeight: 900, fontSize: '1.4rem', color: '#10B981', marginBottom: 6 }}>YOU ARE A GENIUS!</div>
-                <div style={{ color: '#34D399', fontSize: '.85rem', marginBottom: 16, lineHeight: 1.5 }}>
-                  {WIN_QUOTES[Math.floor(Math.random() * WIN_QUOTES.length)]}
-                </div>
-                <div style={{ fontSize: '1.8rem', marginBottom: 16 }}>👏🎉🏅</div>
-              </>
-            )}
-            {gameOverOutcome === 'loss' && (
-              <>
-                <div style={{ fontSize: 52, marginBottom: 8 }}>🤖</div>
-                <div style={{ fontWeight: 900, fontSize: '1.1rem', color: '#EF4444', marginBottom: 6 }}>THE BOT WINS THIS TIME</div>
-                <div style={{ color: '#FCA5A5', fontSize: '.82rem', marginBottom: 16, lineHeight: 1.5, fontStyle: 'italic' }}>
-                  "{LOSE_QUOTES[Math.floor(Math.random() * LOSE_QUOTES.length)]}"
-                </div>
-              </>
-            )}
-            {gameOverOutcome === 'draw' && (
-              <>
-                <div style={{ fontSize: 52, marginBottom: 8 }}>🤝</div>
-                <div style={{ fontWeight: 900, fontSize: '1.2rem', color: '#A5B4FC', marginBottom: 6 }}>IT'S A DRAW!</div>
-                <div style={{ color: '#818CF8', fontSize: '.82rem', marginBottom: 16 }}>Well matched — neither side could finish it!</div>
-              </>
-            )}
-            <div style={{ color: '#4B5563', fontSize: '.72rem', marginBottom: 16 }}>
-              Difficulty: {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
-            </div>
-            <button
-              onClick={() => { setShowGameOverlay(false); startVsComputer() }}
-              style={{ width: '100%', background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', border: 'none', borderRadius: 12, padding: '13px', color: '#fff', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer', marginBottom: 10 }}
-            >
-              🔄 Play Again
-            </button>
-            <button
-              onClick={() => { setShowGameOverlay(false); reset() }}
-              style={{ width: '100%', background: 'transparent', border: '1px solid #1f2937', borderRadius: 12, padding: '11px', color: '#6B7280', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}
-            >
-              ← Home
-            </button>
-          </div>
-        </div>
-      )}
-
       <div className="w-full max-w-md bg-[#0a0516] h-screen sm:h-[850px] flex flex-col justify-between shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden border-x border-slate-900 sm:rounded-3xl">
         
         {/* Render header (present on home screen) */}
         {screen === 'home' && (
           <header className="px-4 pt-3 pb-2 bg-[#0e071f] flex justify-between items-center border-b border-[#1b1233] shrink-0 z-50">
-            <button onClick={reset} className="text-gray-400 hover:text-white transition">
+            <button onPointerDown={reset} className="text-gray-400 hover:text-white transition">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
-            <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => setScreen('home')}>
+            <div className="flex items-center gap-1.5 cursor-pointer" onPointerDown={() => setScreen('home')}>
               <span className="font-bold text-base tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-purple-300">ChessGame</span>
-              <span className="text-lg drop-shadow-[0_0_6px_rgba(168,85,247,0.6)]">â™Ÿï¸</span>
+              <span className="text-lg drop-shadow-[0_0_6px_rgba(168,85,247,0.6)]">♟️</span>
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
             </div>
-            <button onClick={() => { helpFromRef.current = screen; setScreen('help') }} className="text-gray-400 hover:text-white transition">
+            <button onPointerDown={() => { helpFromRef.current = screen; setScreen('help') }} className="text-gray-400 hover:text-white transition">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
             </button>
           </header>
-        )}
-
-        {/* ── Phone Number Modal ── */}
-        {showPhoneModal && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-            <div style={{ background: '#111827', border: '1px solid rgba(99,102,241,.3)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 340, boxShadow: '0 0 40px rgba(99,102,241,.2)' }}>
-              <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                <div style={{ fontSize: 36, marginBottom: 8 }}>📱</div>
-                <div style={{ fontWeight: 900, fontSize: '1.05rem', color: '#eaeaea', marginBottom: 6 }}>
-                  Welcome, {userName}!
-                </div>
-                <div style={{ color: '#6B7280', fontSize: '.78rem', lineHeight: 1.5 }}>
-                  Link your phone number to secure your account and enable withdrawals.
-                </div>
-              </div>
-              <input
-                type="tel"
-                placeholder="+251 9XX XXX XXXX"
-                value={phoneInput}
-                onChange={e => setPhoneInput(e.target.value)}
-                style={{ width: '100%', background: '#0d1117', border: '1px solid rgba(99,102,241,.3)', borderRadius: 10, padding: '11px 14px', color: '#eaeaea', fontSize: '.9rem', marginBottom: 12, outline: 'none', boxSizing: 'border-box' }}
-              />
-              <button
-                onClick={() => {
-                  const cleaned = phoneInput.trim()
-                  if (!cleaned || cleaned.length < 7) { return }
-                  fetch(API + '/api/user/update_phone', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-init-data': initData },
-                    body: JSON.stringify({ phone_number: cleaned })
-                  }).catch(() => {})
-                  setShowPhoneModal(false)
-                }}
-                style={{ width: '100%', background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', border: 'none', borderRadius: 10, padding: '12px', color: '#fff', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer', marginBottom: 8 }}
-              >
-                💾 Save Phone Number
-              </button>
-              <button
-                onClick={() => setShowPhoneModal(false)}
-                style={{ width: '100%', background: 'transparent', border: '1px solid #1f2937', borderRadius: 10, padding: '10px', color: '#6B7280', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}
-              >
-                Skip for now
-              </button>
-            </div>
-          </div>
         )}
 
         {/* Scrollable content area */}
@@ -1981,24 +1767,24 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         {/* Render footer (present on home and profile screens) */}
         {(screen === 'home' || screen === 'profile') && (
           <footer className="bg-[#0b0617] border-t border-[#231545] grid grid-cols-5 text-center py-3 text-gray-300 text-xs font-black shrink-0 z-40 shadow-[0_-8px_25px_rgba(139,92,246,0.15)]">
-            <button onClick={() => setScreen('home')} className={`${screen === 'home' ? 'text-purple-200 drop-shadow-[0_0_12px_rgba(168,85,247,0.75)]' : 'hover:text-gray-150 transition duration-100'} flex flex-col items-center justify-center gap-1`}>
-              <span className="text-lg">ðŸ </span> 
+            <button onPointerDown={() => setScreen('home')} className={`${screen === 'home' ? 'text-purple-200 drop-shadow-[0_0_12px_rgba(168,85,247,0.75)]' : 'hover:text-gray-150 transition duration-100'} flex flex-col items-center justify-center gap-1`}>
+              <span className="text-lg">🏠</span> 
               <span>Home</span>
             </button>
-            <button onClick={() => alert('Leaderboard is displayed below on the home page.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-150">
-              <span className="text-lg">ðŸ†</span>
+            <button onPointerDown={() => alert('Leaderboard is displayed below on the home page.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-150">
+              <span className="text-lg">🏆</span>
               <span>Rank</span>
             </button>
-            <button onClick={() => { setScreen('profile') }} className={`${screen === 'profile' ? 'text-purple-200 drop-shadow-[0_0_12px_rgba(168,85,247,0.75)]' : 'hover:text-gray-150 transition duration-100'} flex flex-col items-center justify-center gap-1`}>
-              <span className="text-lg">ðŸ“œ</span>
+            <button onPointerDown={() => { setScreen('profile') }} className={`${screen === 'profile' ? 'text-purple-200 drop-shadow-[0_0_12px_rgba(168,85,247,0.75)]' : 'hover:text-gray-150 transition duration-100'} flex flex-col items-center justify-center gap-1`}>
+              <span className="text-lg">📜</span>
               <span>History</span>
             </button>
-            <button onClick={() => alert('Support Chat coming soon.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100">
-              <span className="text-lg">ðŸ’¬</span>
+            <button onPointerDown={() => alert('Support Chat coming soon.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100">
+              <span className="text-lg">💬</span>
               <span>Chat</span>
             </button>
-            <button onClick={() => setScreen('profile')} className={`hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100`}>
-              <span className="text-lg">ðŸ‘¤</span>
+            <button onPointerDown={() => setScreen('profile')} className={`hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100`}>
+              <span className="text-lg">👤</span>
               <span>Me</span>
             </button>
           </footer>
