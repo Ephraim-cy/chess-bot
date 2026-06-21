@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Chess } from 'chess.js'
 
 const API = 'https://chess-bot-production-efa2.up.railway.app'
@@ -1732,9 +1732,74 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
     )
   }
 
+ // ─── GAME OVER OVERLAY ────────────────────────────────────────────────────
+  const WIN_QUOTES = [
+    "You're a chess GENIUS! 🧠",
+    "Absolutely LEGENDARY move! 👑",
+    "The opponent never saw it coming! ⚡",
+    "Checkmate master! You crushed it! 💪",
+    "Flawless victory! Pure brilliance! 🌟",
+  ]
+  const LOSE_QUOTES = [
+    "Even Magnus Carlsen lost games. Keep going! 😤",
+    "The bot says: 'Better luck next time, human!' 🤖",
+    "That was... rough. Train harder! 📚",
+    "My grandmother plays better chess! 👵 (just kidding, try again!)",
+    "Defeat is the best teacher. Study that game! 🔍",
+  ]
+
   // ─── CONSOLIDATED RENDER ───────────────────────────────────────────────────
   return (
     <div className="text-white flex justify-center items-center min-h-screen p-0 sm:p-4 bg-[#03010a] font-sans">
+      {/* ── Bot Game Over Overlay ── */}
+      {showGameOverlay && isBot && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: gameOverOutcome === 'win' ? 'linear-gradient(135deg,#0d2918,#0a2010)' : gameOverOutcome === 'loss' ? 'linear-gradient(135deg,#2a0a0a,#1a0505)' : 'linear-gradient(135deg,#111827,#0d1117)', border: `1px solid ${gameOverOutcome === 'win' ? 'rgba(16,185,129,.4)' : gameOverOutcome === 'loss' ? 'rgba(239,68,68,.4)' : 'rgba(99,102,241,.3)'}`, borderRadius: 20, padding: 28, width: '100%', maxWidth: 340, textAlign: 'center', boxShadow: gameOverOutcome === 'win' ? '0 0 40px rgba(16,185,129,.25)' : '0 0 40px rgba(239,68,68,.2)' }}>
+            {gameOverOutcome === 'win' && (
+              <>
+                <div style={{ fontSize: 52, marginBottom: 8, animation: 'pulse 1s infinite' }}>🏆</div>
+                <div style={{ fontWeight: 900, fontSize: '1.4rem', color: '#10B981', marginBottom: 6 }}>YOU ARE A GENIUS!</div>
+                <div style={{ color: '#34D399', fontSize: '.85rem', marginBottom: 16, lineHeight: 1.5 }}>
+                  {WIN_QUOTES[Math.floor(Math.random() * WIN_QUOTES.length)]}
+                </div>
+                <div style={{ fontSize: '1.8rem', marginBottom: 16 }}>👏🎉🏅</div>
+              </>
+            )}
+            {gameOverOutcome === 'loss' && (
+              <>
+                <div style={{ fontSize: 52, marginBottom: 8 }}>🤖</div>
+                <div style={{ fontWeight: 900, fontSize: '1.1rem', color: '#EF4444', marginBottom: 6 }}>THE BOT WINS THIS TIME</div>
+                <div style={{ color: '#FCA5A5', fontSize: '.82rem', marginBottom: 16, lineHeight: 1.5, fontStyle: 'italic' }}>
+                  "{LOSE_QUOTES[Math.floor(Math.random() * LOSE_QUOTES.length)]}"
+                </div>
+              </>
+            )}
+            {gameOverOutcome === 'draw' && (
+              <>
+                <div style={{ fontSize: 52, marginBottom: 8 }}>🤝</div>
+                <div style={{ fontWeight: 900, fontSize: '1.2rem', color: '#A5B4FC', marginBottom: 6 }}>IT'S A DRAW!</div>
+                <div style={{ color: '#818CF8', fontSize: '.82rem', marginBottom: 16 }}>Well matched — neither side could finish it!</div>
+              </>
+            )}
+            <div style={{ color: '#4B5563', fontSize: '.72rem', marginBottom: 16 }}>
+              Difficulty: {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+            </div>
+            <button
+              onClick={() => { setShowGameOverlay(false); startVsComputer() }}
+              style={{ width: '100%', background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', border: 'none', borderRadius: 12, padding: '13px', color: '#fff', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer', marginBottom: 10 }}
+            >
+              🔄 Play Again
+            </button>
+            <button
+              onClick={() => { setShowGameOverlay(false); reset() }}
+              style={{ width: '100%', background: 'transparent', border: '1px solid #1f2937', borderRadius: 12, padding: '11px', color: '#6B7280', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}
+            >
+              ← Home
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="w-full max-w-md bg-[#0a0516] h-screen sm:h-[850px] flex flex-col justify-between shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden border-x border-slate-900 sm:rounded-3xl">
         
         {/* Render header (present on home screen) */}
