@@ -35,7 +35,7 @@ from escrow import (
     get_or_create_user, get_user, get_balance,
     lock_escrow, settle_match, refund_match,
     get_transaction_history, get_owner_earnings,
-    admin_credit, OWNER_TELEGRAM_ID
+    admin_credit, OWNER_TELEGRAM_ID, record_bot_game
 )
 from dotenv import load_dotenv
 
@@ -488,10 +488,10 @@ async def ws_queue(ws: WebSocket, stake: float, currency: str, init: str = "test
         await ws.send_json({"type": "error", "msg": "Invalid currency"})
         await ws.close(code=1008); return
 
-    # 2. Validate stake
+  # 2. Validate stake (0 = free game, always valid)
     try:
         stake = float(stake)
-        if stake <= 0 or stake > 1000:
+        if stake < 0 or stake > 1000:
             raise ValueError()
     except Exception:
         await ws.send_json({"type": "error", "msg": "Invalid stake"})
@@ -510,7 +510,7 @@ async def ws_queue(ws: WebSocket, stake: float, currency: str, init: str = "test
     from decimal import Decimal
     user = get_or_create_user(tg_id, username)
     require_active_account(user.status, tg_id)
-    if user.playable_balance < Decimal(str(stake)):
+    if stake > 0 and user.playable_balance < Decimal(str(stake)):
         await ws.send_json({"type": "error", "msg": f"Insufficient balance. Need {stake} {currency}."})
         await ws.close(code=1008); return
 
@@ -611,3 +611,59 @@ async def ws_queue(ws: WebSocket, stake: float, currency: str, init: str = "test
     except Exception:
         async with _queue_lock:
             _queue[queue_key] = [e for e in _queue[queue_key] if e["telegram_id"] != tg_id]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  NEW ENDPOINTS: OPEN MATCHES, PHONE REGISTRATION & BOT HISTORY
+# ─────────────────────────────────────────────────────────────────────────────
+
+class UpdatePhoneRequest(BaseModel):
+    phone_number: str
+
+class RecordBotGameRequest(BaseModel):
+    outcome: str
+    difficulty: str
+
+@app.get("/api/matches/open")
+async def list_open_matches(x_init_data: str = Header(default="test")):
+    # Verify Telegram identity securely
+    verify_telegram(x_init_data)
+    
+    open_matches = []
+    for match_id, game in active_games.items():
+        if game.get("status") == "waiting" and game.get("black_tg") is None:
+            creator_name = "Player"
+            try:
+                creator = get_user(game["white_tg"])
+                creator_name = creator.username
+            except Exception:
+                pass
+            open_matches.append({
+                "match_id": match_id,
+                "creator_name": creator_name,
+                "stake": game["stake"],
+                "currency": game["currency"],
+                "created_at": game.get("created_at", time.time())
+            })
+    return open_matches
+
+@app.post("/api/user/update_phone")
+async def update_phone(body: UpdatePhoneRequest, x_init_data: str = Header(default="test")):
+    user_data = verify_telegram(x_init_data)
+    tg_id = int(user_data["id"])
+    user = get_or_create_user(tg_id, user_data.get("username", f"user_{tg_id}"))
+    user.phone_number = body.phone_number.strip()
+    return {"status": "success", "phone_number": user.phone_number}
+
+@app.post("/api/history/bot")
+async def record_bot_match(body: RecordBotGameRequest, x_init_data: str = Header(default="test")):
+    user_data = verify_telegram(x_init_data)
+    tg_id = int(user_data["id"])
+    
+    if body.outcome not in ("win", "loss", "draw"):
+        raise HTTPException(400, "Invalid outcome")
+    if body.difficulty not in ("easy", "medium", "hard"):
+        raise HTTPException(400, "Invalid difficulty")
+        
+    tx_dict = record_bot_game(tg_id, body.outcome, body.difficulty)
+    return {"status": "success", "game": tx_dict}
