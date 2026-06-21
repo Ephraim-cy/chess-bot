@@ -488,10 +488,10 @@ async def ws_queue(ws: WebSocket, stake: float, currency: str, init: str = "test
         await ws.send_json({"type": "error", "msg": "Invalid currency"})
         await ws.close(code=1008); return
 
-  # 2. Validate stake (0 = free game, always valid)
+    # 2. Validate stake
     try:
         stake = float(stake)
-        if stake < 0 or stake > 1000:
+        if stake <= 0 or stake > 1000:
             raise ValueError()
     except Exception:
         await ws.send_json({"type": "error", "msg": "Invalid stake"})
@@ -510,7 +510,7 @@ async def ws_queue(ws: WebSocket, stake: float, currency: str, init: str = "test
     from decimal import Decimal
     user = get_or_create_user(tg_id, username)
     require_active_account(user.status, tg_id)
-    if stake > 0 and user.playable_balance < Decimal(str(stake)):
+    if user.playable_balance < Decimal(str(stake)):
         await ws.send_json({"type": "error", "msg": f"Insufficient balance. Need {stake} {currency}."})
         await ws.close(code=1008); return
 
