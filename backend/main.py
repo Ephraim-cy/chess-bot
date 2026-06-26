@@ -35,7 +35,7 @@ from escrow import (
     get_or_create_user, get_user, get_balance,
     lock_escrow, settle_match, refund_match,
     get_transaction_history, get_owner_earnings,
-    admin_credit, OWNER_TELEGRAM_ID
+    admin_credit, OWNER_TELEGRAM_ID, record_bot_game
 )
 from dotenv import load_dotenv
 
@@ -77,7 +77,7 @@ async def root():
 async def get_my_profile(x_init_data: str = Header(default="test")):
     user_data = verify_telegram(x_init_data)
     tg_id     = int(user_data["id"])
-    username  = user_data.get("username", f"user_{tg_id}")
+    username  = user_data.get("username") or user_data.get("first_name") or f"user_{tg_id}"
 
     # Create user on first visit
     user = get_or_create_user(tg_id, username)
@@ -85,11 +85,12 @@ async def get_my_profile(x_init_data: str = Header(default="test")):
     return {
         "id":               user.id,
         "telegram_id":      tg_id,
-        "username":         username,
+        "username":         user.username,
         "playable_balance": float(user.playable_balance),
         "locked_balance":   float(user.locked_balance),
         "status":           user.status,
         "balance":          get_balance(tg_id),
+        "phone_number":     getattr(user, "phone_number", None),
     }
 
 @app.get("/api/balance")
@@ -287,6 +288,56 @@ async def get_match_info(match_id: str, x_init_data: str = Header(default="test"
     }
 
 
+@app.get("/api/matches/open")
+async def get_open_matches(x_init_data: str = Header(default="test")):
+    verify_telegram(x_init_data)
+    open_lobbies = []
+    for match_id, game in active_games.items():
+        if game.get("status") == "waiting" and game.get("black_tg") is None:
+            open_lobbies.append({
+                "match_id": match_id,
+                "white_tg": game["white_tg"],
+                "stake": float(game["stake"]) if hasattr(game["stake"], "to_eng_string") or isinstance(game["stake"], Decimal) else game["stake"],
+                "currency": game.get("currency", "USDT"),
+                "created_at": game.get("created_at")
+            })
+    return open_lobbies
+
+
+class UpdatePhoneRequest(BaseModel):
+    phone_number: str
+
+
+@app.post("/api/user/update_phone")
+async def update_phone(body: UpdatePhoneRequest, x_init_data: str = Header(default="test")):
+    user_data = verify_telegram(x_init_data)
+    tg_id     = int(user_data["id"])
+    username  = user_data.get("username") or user_data.get("first_name") or f"user_{tg_id}"
+    user      = get_or_create_user(tg_id, username)
+    user.phone_number = body.phone_number.strip()
+    return {"status": "success", "phone_number": user.phone_number}
+
+
+class RecordBotGameRequest(BaseModel):
+    outcome: str
+    difficulty: str
+
+
+@app.post("/api/history/bot")
+async def record_bot_match(body: RecordBotGameRequest, x_init_data: str = Header(default="test")):
+    user_data = verify_telegram(x_init_data)
+    tg_id     = int(user_data["id"])
+    username  = user_data.get("username") or user_data.get("first_name") or f"user_{tg_id}"
+    get_or_create_user(tg_id, username)
+    
+    outcome = body.outcome.strip().lower()
+    if outcome not in ["win", "loss", "draw"]:
+        raise HTTPException(400, "Invalid outcome")
+    difficulty = body.difficulty.strip().lower()
+    record_bot_game(tg_id, outcome, difficulty)
+    return {"status": "success"}
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  WEBSOCKET GAME SERVER
 #  Server is the authority on the board. A bad move gets a clean error and
@@ -323,14 +374,32 @@ async def ws_game(ws: WebSocket, match_id: str, color: str):
     game["ws"][color] = ws
     game.setdefault("bad_move_count", {"white": 0, "black": 0})
 
-    await ws.send_json({
-        "type":  "connected",
-        "color": color,
-        "fen":   game["board"].fen(),
-        "stake": game["stake"],
-        "pool":  game["stake"] * 2,
-        "turn":  "white" if game["board"].turn == chess.WHITE else "black",
-    })
+    # If both players are now connected, notify both of them!
+    if game["ws"]["white"] and game["ws"]["black"]:
+        for side in ("white", "black"):
+            side_ws = game["ws"][side]
+            if side_ws:
+                try:
+                    await side_ws.send_json({
+                        "type":  "connected",
+                        "color": side,
+                        "fen":   game["board"].fen(),
+                        "stake": game["stake"],
+                        "pool":  game["stake"] * 2,
+                        "turn":  "white" if game["board"].turn == chess.WHITE else "black",
+                    })
+                except Exception:
+                    pass
+    else:
+        # Otherwise, just notify the player who just connected
+        await ws.send_json({
+            "type":  "connected",
+            "color": color,
+            "fen":   game["board"].fen(),
+            "stake": game["stake"],
+            "pool":  game["stake"] * 2,
+            "turn":  "white" if game["board"].turn == chess.WHITE else "black",
+        })
 
     try:
         while True:
@@ -492,7 +561,7 @@ async def ws_queue(ws: WebSocket, stake: float, currency: str, init: str = "test
     # 2. Validate stake
     try:
         stake = float(stake)
-        if stake <= 0 or stake > 1000:
+        if stake < 0 or stake > 1000:
             raise ValueError()
     except Exception:
         await ws.send_json({"type": "error", "msg": "Invalid stake"})
@@ -551,7 +620,7 @@ async def ws_queue(ws: WebSocket, stake: float, currency: str, init: str = "test
 
             # Lock escrow for both
             try:
-                lock_escrow(match_id, opponent["telegram_id"], tg_id, stake)
+                lock_escrow(match_id, opponent["telegram_id"], tg_id, stake, currency)
             except Exception as ex:
                 active_games.pop(match_id, None)
                 err_msg = {"type": "error", "msg": f"Escrow failed: {str(ex)}"}

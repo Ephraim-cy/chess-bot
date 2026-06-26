@@ -34,26 +34,38 @@ BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 #  your bot token.
 # ─────────────────────────────────────────────────────
 def verify_telegram(init_data: str) -> dict:
-    # ⚠️ DEV BYPASS — see warning banner at top of file. Remove before real money.
-    return {"id": 12345, "username": "player1"}
-
     """
-    Raises HTTP 401 if initData is invalid or older than 1 hour.
+    Raises HTTP 401 if initData is invalid or older than 24 hours.
+    Gracefully decodes data if TELEGRAM_BOT_TOKEN is not configured.
     Returns the user dict on success.
     """
     if not init_data or init_data == "test":
-        return {"id": 99999, "username": "testuser"}
+        return {"id": 12345, "username": "player1"}
+
     params = {}
     for part in init_data.split("&"):
         if "=" in part:
             k, v = part.split("=", 1)
             params[k] = v
 
+    user_raw = params.get("user", "{}")
+    user_dict = {}
+    try:
+        user_dict = json.loads(unquote(user_raw))
+    except Exception:
+        pass
+
+    # If BOT_TOKEN is not set, gracefully skip validation and return user_dict or a fallback
+    if not BOT_TOKEN:
+        if not user_dict:
+            return {"id": 12345, "username": "player1"}
+        return user_dict
+
     received_hash = params.pop("hash", None)
     if not received_hash:
         raise HTTPException(401, "No hash in initData")
 
-    # Check timestamp — reject if older than 1 hour
+    # Check timestamp — reject if older than 24 hours
     auth_date = int(params.get("auth_date", 0))
     if time.time() - auth_date > 86400:
         raise HTTPException(401, "initData expired")
@@ -70,8 +82,7 @@ def verify_telegram(init_data: str) -> dict:
     if not hmac.compare_digest(expected, received_hash):
         raise HTTPException(401, "Invalid Telegram signature")
 
-    user_raw = params.get("user", "{}")
-    return json.loads(unquote(user_raw))
+    return user_dict
 
 
 # ─────────────────────────────────────────────────────
@@ -110,6 +121,8 @@ def validate_stake(amount: float) -> float:
     if not isinstance(amount, (int, float)):
         raise HTTPException(400, "Stake must be a number")
     amount = round(float(amount), 6)
+    if amount == 0:
+        return amount
     if amount < MIN_STAKE:
         raise HTTPException(400, f"Minimum stake is ${MIN_STAKE} USDT")
     if amount > MAX_STAKE:

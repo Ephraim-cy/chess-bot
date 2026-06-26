@@ -38,6 +38,7 @@ class UserRecord:
         self.locked_balance   = Decimal("0")
         self.status           = "active"   # active | flagged | banned
         self.created_at       = datetime.now(timezone.utc)
+        self.phone_number     = None
 
     def total_balance(self):
         return self.playable_balance + self.locked_balance
@@ -49,11 +50,12 @@ class UserRecord:
             "playable_balance": float(self.playable_balance),
             "locked_balance":   float(self.locked_balance),
             "status":           self.status,
+            "phone_number":     self.phone_number,
         }
 
 
 class MatchRecord:
-    def __init__(self, match_id, white_id, black_id, stake):
+    def __init__(self, match_id, white_id, black_id, stake, currency="USDT"):
         self.id           = match_id
         self.player_white = white_id     # telegram_id
         self.player_black = black_id     # telegram_id
@@ -62,6 +64,7 @@ class MatchRecord:
         self.winner_id    = None
         self.status       = "locked"     # locked | settled | refunded | disputed
         self.settled_at   = None
+        self.currency     = currency
 
 
 class TransactionRecord:
@@ -94,6 +97,9 @@ def get_or_create_user(telegram_id: int, username: str) -> UserRecord:
     """Get existing user or create a new one with zero balance."""
     if telegram_id not in _users:
         _users[telegram_id] = UserRecord(telegram_id, username)
+    else:
+        if username and _users[telegram_id].username != username:
+            _users[telegram_id].username = username
     return _users[telegram_id]
 
 
@@ -124,14 +130,17 @@ def admin_credit(telegram_id: int, amount: float, note: str = "manual_credit"):
 #  and moves it to locked_balance.
 # ─────────────────────────────────────────────────────────────────────────────
 
-def lock_escrow(match_id: str, white_tg: int, black_tg: int, stake: float) -> MatchRecord:
+def lock_escrow(match_id: str, white_tg: int, black_tg: int, stake: float, currency: str = "USDT") -> MatchRecord:
     """
     ATOMIC: either BOTH players are charged, or NEITHER is.
     If one player doesn't have enough balance, the whole operation fails
     and no money moves.
     """
     if float(stake) == 0:
-        return  # Free game — no escrow needed
+        # Create a free match record in _matches so that settle_match works normally
+        match = MatchRecord(match_id, white_tg, black_tg, Decimal("0"), currency)
+        _matches[match_id] = match
+        return match
     stake_d = Decimal(str(stake)).quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
     white   = get_user(white_tg)
     black   = get_user(black_tg)
@@ -154,7 +163,7 @@ def lock_escrow(match_id: str, white_tg: int, black_tg: int, stake: float) -> Ma
     white.locked_balance   += stake_d
     _transactions.append(TransactionRecord(
         white_tg, match_id, "escrow_lock", stake_d, "out",
-        f"Locked for match {match_id[:8]}"
+        f"Locked for match {match_id[:8]} ({currency})"
     ))
 
     # Black
@@ -162,14 +171,14 @@ def lock_escrow(match_id: str, white_tg: int, black_tg: int, stake: float) -> Ma
     black.locked_balance   += stake_d
     _transactions.append(TransactionRecord(
         black_tg, match_id, "escrow_lock", stake_d, "out",
-        f"Locked for match {match_id[:8]}"
+        f"Locked for match {match_id[:8]} ({currency})"
     ))
 
     # Create match record
-    match = MatchRecord(match_id, white_tg, black_tg, stake_d)
+    match = MatchRecord(match_id, white_tg, black_tg, stake_d, currency)
     _matches[match_id] = match
 
-    print(f"[ESCROW] Locked ${stake_d*2} for match {match_id[:8]} "
+    print(f"[ESCROW] Locked ${stake_d*2} {currency} for match {match_id[:8]} "
           f"(white:{white_tg}, black:{black_tg})")
 
     return match
@@ -225,16 +234,23 @@ def settle_match(match_id: str, winner_telegram_id: int) -> dict:
     # ── Pay winner ──
     winner.playable_balance += winner_gets
     _transactions.append(TransactionRecord(
-        winner_telegram_id, match_id, "escrow_release", winner_gets, "in",
-        f"Won match {match_id[:8]} (after {int(RAKE_PERCENT*100)}% rake)"
+        winner_telegram_id, match_id, "winnings", winner_gets, "in",
+        f"Won match {match_id[:8]} ({match.currency})" + (f" (after {int(RAKE_PERCENT*100)}% rake)" if match.stake_amount > 0 else "")
     ))
 
-    # ── Send rake to owner ──
-    owner.playable_balance += rake
+    # ── Record loss for loser ──
     _transactions.append(TransactionRecord(
-        OWNER_TELEGRAM_ID, match_id, "rake", rake, "in",
-        f"Rake from match {match_id[:8]}"
+        loser_telegram_id, match_id, "loss", match.stake_amount, "out",
+        f"Lost match {match_id[:8]} ({match.currency})"
     ))
+
+    # ── Send rake to owner (only if stake > 0) ──
+    if match.stake_amount > 0:
+        owner.playable_balance += rake
+        _transactions.append(TransactionRecord(
+            OWNER_TELEGRAM_ID, match_id, "rake", rake, "in",
+            f"Rake from match {match_id[:8]} ({match.currency})"
+        ))
 
     # ── Mark match as settled ──
     match.status      = "settled"
@@ -248,11 +264,12 @@ def settle_match(match_id: str, winner_telegram_id: int) -> dict:
         "winner_payout":     float(winner_gets),
         "rake_to_owner":     float(rake),
         "settled_at":        match.settled_at.isoformat(),
+        "currency":          match.currency,
     }
 
-    print(f"[SETTLE] Match {match_id[:8]}: "
-          f"winner {winner_telegram_id} gets ${winner_gets}, "
-          f"owner gets ${rake} rake")
+    print(f"[SETTLE] Match {match_id[:8]} ({match.currency}): "
+          f"winner {winner_telegram_id} gets {winner_gets}, "
+          f"owner gets {rake} rake")
 
     return summary
 
@@ -277,8 +294,8 @@ def refund_match(match_id: str, reason: str = "draw") -> dict:
         player.locked_balance   -= match.stake_amount
         player.playable_balance += match.stake_amount
         _transactions.append(TransactionRecord(
-            player_id, match_id, "escrow_release", match.stake_amount, "in",
-            f"Refund — {reason}"
+            player_id, match_id, "refund", match.stake_amount, "in",
+            f"Refund — {reason} ({match.currency})"
         ))
 
     match.status     = "refunded"
@@ -310,6 +327,23 @@ def get_balance(telegram_id: int) -> dict:
 def get_transaction_history(telegram_id: int, limit: int = 20) -> list:
     user_txs = [t for t in _transactions if t.user_id == telegram_id]
     return [t.to_dict() for t in reversed(user_txs[-limit:])]
+
+
+def record_bot_game(telegram_id: int, outcome: str, difficulty: str):
+    """Log a bot match outcome to the transaction history."""
+    tx_type = f"bot_{outcome}"  # bot_win | bot_loss | bot_draw
+    direction = "in" if outcome == "win" else "out" if outcome == "loss" else "in"
+    note = f"VS AI ({difficulty.capitalize()})"
+    tx = TransactionRecord(
+        user_id=telegram_id,
+        match_id=str(uuid.uuid4()),
+        tx_type=tx_type,
+        amount=Decimal("0"),
+        direction=direction,
+        note=note
+    )
+    _transactions.append(tx)
+    return tx
 
 
 def get_owner_earnings() -> dict:

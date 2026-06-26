@@ -1,9 +1,25 @@
-﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Chess } from 'chess.js'
 
 const API = 'https://chess-bot-production-efa2.up.railway.app'
 const WSS = 'wss://chess-bot-production-efa2.up.railway.app'
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+
+const WIN_QUOTES = [
+  "You're a chess GENIUS! 🧠",
+  "Absolutely LEGENDARY move! 👑",
+  "The opponent never saw it coming! ⚡",
+  "Checkmate master! You crushed it! 💪",
+  "Flawless victory! Pure brilliance! 🌟",
+]
+
+const LOSE_QUOTES = [
+  "Even Magnus Carlsen lost games. Keep going! 😤",
+  "The bot says: 'Better luck next time, human!' 🤖",
+  "That was... rough. Train harder! 📚",
+  "My grandmother plays better chess! 👵 (just kidding, try again!)",
+  "Defeat is the best teacher. Study that game! 🔍",
+]
 // â”€â”€â”€ CURRENCY CONFIG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Stakes, symbols, and decimals per currency.
 // All financial validation happens SERVER-SIDE â€” this is display config only.
@@ -113,7 +129,6 @@ function fetchAIMove(fen, difficulty) {
           return resolve(m.from + m.to + (m.promotion || ''))
         }
 
-        // Shuffle moves for variety before searching
         for (let i = moves.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [moves[i], moves[j]] = [moves[j], moves[i]]
@@ -138,11 +153,11 @@ function fetchAIMove(fen, difficulty) {
       } catch {
         resolve(null)
       }
-    }, 80) // 80ms delay â€” lets React render "thinking..." before engine starts
+    }, 80)
   })
 }
 
-// â”€â”€â”€ SOUND ENGINE (Web Audio API â€” no libraries needed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ———————————————————————————————————————————————————————————————————————————————————
 const AudioCtx = window.AudioContext || window.webkitAudioContext
 function createSoundEngine() {
   let ctx = null
@@ -150,16 +165,56 @@ function createSoundEngine() {
   function getCtx() {
     if (!AudioCtx) return null
     if (!ctx) ctx = new AudioCtx()
-    // Resume if suspended (browser autoplay policy)
     if (ctx.state === 'suspended') ctx.resume()
     return ctx
-}
+  }
+
+  function clap() {
+    const c = getCtx()
+    if (!c) return
+    const now = c.currentTime
+
+    const bufferSize = c.sampleRate * 0.4
+    const buffer = c.createBuffer(1, bufferSize, c.sampleRate)
+    const data = buffer.getChannelData(0)
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1
+    }
+
+    const filter = c.createBiquadFilter()
+    filter.type = 'bandpass'
+    filter.frequency.value = 1000
+    filter.Q.value = 1.5
+
+    const gainNode = c.createGain()
+    gainNode.gain.setValueAtTime(0, now)
+
+    gainNode.gain.linearRampToValueAtTime(0.15, now + 0.01)
+    gainNode.gain.linearRampToValueAtTime(0.02, now + 0.02)
+    
+    gainNode.gain.linearRampToValueAtTime(0.25, now + 0.03)
+    gainNode.gain.linearRampToValueAtTime(0.04, now + 0.04)
+
+    gainNode.gain.linearRampToValueAtTime(0.4, now + 0.05)
+    gainNode.gain.linearRampToValueAtTime(0.06, now + 0.06)
+
+    gainNode.gain.linearRampToValueAtTime(1.0, now + 0.07)
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.35)
+
+    const noiseSource = c.createBufferSource()
+    noiseSource.buffer = buffer
+    noiseSource.connect(filter)
+    filter.connect(gainNode)
+    gainNode.connect(c.destination)
+
+    noiseSource.start(now)
+    noiseSource.stop(now + 0.4)
+  }
 
   function playTone({ type = 'sine', freq, freq2, duration, volume = 0.4, attack = 0.01, decay = 0.1, fadeStart, notes }) {
     const c = getCtx()
     const now = c.currentTime
 
-    // If notes array given, play each note sequentially
     if (notes) {
       notes.forEach(n => playTone(n))
       return
@@ -188,18 +243,15 @@ function createSoundEngine() {
   }
 
   return {
-    // Soft woody thud â€” piece placed on board
     move() {
       playTone({ type: 'triangle', freq: 180, freq2: 90, duration: 0.18, volume: 0.5, attack: 0.005 })
     },
 
-    // Harder crack â€” piece taken
     capture() {
       playTone({ type: 'sawtooth', freq: 260, freq2: 80, duration: 0.22, volume: 0.45, attack: 0.005 })
       setTimeout(() => playTone({ type: 'triangle', freq: 120, duration: 0.15, volume: 0.3 }), 60)
     },
 
-    // Tense two-tone pulse â€” king is in check
     check() {
       playTone({ notes: [
         { type: 'square', freq: 440, duration: 0.12, volume: 0.3, attack: 0.01 },
@@ -208,13 +260,11 @@ function createSoundEngine() {
       setTimeout(() => playTone({ type: 'square', freq: 554, duration: 0.14, volume: 0.3 }), 160)
     },
 
-    // Castling â€” double knock
     castle() {
       playTone({ type: 'triangle', freq: 200, freq2: 110, duration: 0.16, volume: 0.45, attack: 0.005 })
       setTimeout(() => playTone({ type: 'triangle', freq: 160, freq2: 90, duration: 0.16, volume: 0.35, attack: 0.005 }), 120)
     },
 
-    // Rising arpeggio â€” game start
     gameStart() {
       const notes = [261, 329, 392, 523]
       notes.forEach((f, i) => {
@@ -222,7 +272,6 @@ function createSoundEngine() {
       })
     },
 
-    // Triumphant fanfare â€” you win
     win() {
       const seq = [
         { freq: 392, dur: 120 }, { freq: 392, dur: 120 }, { freq: 392, dur: 120 },
@@ -233,9 +282,17 @@ function createSoundEngine() {
         setTimeout(() => playTone({ type: 'sine', freq, duration: dur / 1000 + 0.05, volume: 0.35, attack: 0.02 }), t)
         t += dur + 20
       })
+      setTimeout(() => {
+        clap()
+        setTimeout(() => clap(), 150)
+        setTimeout(() => clap(), 300)
+        setTimeout(() => clap(), 450)
+        setTimeout(() => clap(), 600)
+        setTimeout(() => clap(), 750)
+        setTimeout(() => clap(), 900)
+      }, 500)
     },
 
-    // Descending sad tones â€” you lose
     lose() {
       const seq = [{ freq: 330, dur: 200 }, { freq: 277, dur: 200 }, { freq: 220, dur: 400 }]
       let t = 0
@@ -246,19 +303,25 @@ function createSoundEngine() {
     },
 
     // Neutral chord â€” draw
+    // Neutral chord — draw
     draw() {
       playTone({ type: 'sine', freq: 330, duration: 0.5, volume: 0.25, attack: 0.04 })
       playTone({ type: 'sine', freq: 392, duration: 0.5, volume: 0.2,  attack: 0.04 })
     },
 
-    // Soft click â€” UI button press
+    // Soft click — UI button press
     click() {
       playTone({ type: 'sine', freq: 600, freq2: 400, duration: 0.08, volume: 0.2, attack: 0.005 })
+    },
+
+    // Expose clap synthesized sound
+    clap() {
+      clap()
     }
   }
 }
 
-// Single instance â€” created lazily on first user interaction
+// Single instance — created lazily on first user interaction
 let _sfx = null
 function sfx() {
   if (!_sfx) _sfx = createSoundEngine()
@@ -749,6 +812,42 @@ const S = {
 }
 
 // â”€â”€â”€ MAIN APP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Confetti Component
+const Confetti = () => {
+  const pieces = useMemo(() => {
+    const colors = ['#f43f5e', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+    return Array.from({ length: 45 }).map((_, i) => {
+      const size = Math.random() * 8 + 6;
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const left = Math.random() * 100;
+      const duration = Math.random() * 2.5 + 2.5;
+      const delay = Math.random() * 2.5;
+      const shapes = ['rounded-sm', 'rounded-full', 'rotate-45'];
+      const shape = shapes[Math.floor(Math.random() * shapes.length)];
+      return {
+        id: i,
+        style: {
+          left: `${left}%`,
+          width: `${size}px`,
+          height: `${size}px`,
+          backgroundColor: color,
+          animationDuration: `${duration}s`,
+          animationDelay: `${delay}s`,
+        },
+        className: `confetti-piece ${shape}`
+      };
+    });
+  }, []);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-50">
+      {pieces.map(p => (
+        <div key={p.id} className={p.className} style={p.style} />
+      ))}
+    </div>
+  );
+};
+
 export default function App() {
   const [screen, setScreen]   = useState('home')
   const helpFromRef           = useRef('home')
@@ -801,6 +900,37 @@ export default function App() {
   const [showGameOverlay, setShowGameOverlay] = useState(false)
   const [gameOverOutcome, setGameOverOutcome] = useState(null) // 'win' | 'loss' | 'draw'
   const [botGameSaved, setBotGameSaved] = useState(false)
+  const [overlayQuote, setOverlayQuote] = useState('')
+
+  const handleSkipPhone = () => {
+    setShowPhoneModal(false)
+    const randomHours = 2 + Math.random() * 34
+    const nextTime = Date.now() + Math.round(randomHours * 60 * 60 * 1000)
+    localStorage.setItem('phonePromptNextTime', nextTime.toString())
+  }
+
+  const handleSharePhone = async () => {
+    if (!phoneInput.trim()) {
+      alert('Please enter a valid phone number.')
+      return
+    }
+    try {
+      const res = await fetch(API + '/api/user/update_phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-init-data': initData },
+        body: JSON.stringify({ phone_number: phoneInput })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setShowPhoneModal(false)
+        setStatus('✅ Phone number linked successfully!')
+      } else {
+        alert('Failed to save phone number.')
+      }
+    } catch (e) {
+      alert('Error: ' + e.message)
+    }
+  }
 
   function bump() { setTick(t => t + 1) }
 
@@ -816,11 +946,11 @@ export default function App() {
   // Step 2: Style Select ('free' or 'bet')
   const handleSelectStyle = (styleType) => {
     if (currentStep < 1) {
-      setStatus('âš ï¸ First choice who u wanna play with!')
+      setStatus(" First choice who u wanna play with!")
       return
     }
     if (mode === 'computer' && styleType === 'bet') {
-      setStatus("âŒ Play With Bet is unacceptable against AI mode! Choose 'Play For Free'.")
+      setStatus("Play With Bet is unacceptable against AI mode! Choose 'Play For Free'.")
       return
     }
 
@@ -842,9 +972,42 @@ export default function App() {
     setStatus('')
   }
 
-  // â”€â”€â”€ AUTO-REGISTER: runs once on load â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Calls /api/me â€” backend creates user row if first visit, returns profile if existing.
-  // Silent â€” user never sees a "sign up" screen.
+  function checkComputerGameOver(chess) {
+    if (!chess.isGameOver()) return
+    setGameOver(true)
+    let outcome = 'draw'
+    if (chess.isCheckmate()) {
+      const winner = chess.turn() === 'w' ? 'black' : 'white'
+      if (winner === playerColor) {
+        sfx().win(); setStatus('🏆 You win! Checkmate!')
+        outcome = 'win'
+        const randomWin = WIN_QUOTES[Math.floor(Math.random() * WIN_QUOTES.length)]
+        setOverlayQuote(randomWin)
+      } else {
+        sfx().lose(); setStatus('💀 Computer wins!')
+        outcome = 'loss'
+        const randomLose = LOSE_QUOTES[Math.floor(Math.random() * LOSE_QUOTES.length)]
+        setOverlayQuote(randomLose)
+      }
+    } else {
+      sfx().draw()
+      setStatus('½ Draw!')
+      setOverlayQuote("It's a draw! Well played! 🤝")
+    }
+    setGameOverOutcome(outcome)
+    setShowGameOverlay(true)
+    setBotGameSaved(false)
+    // Save bot game to history
+    fetch(API + '/api/history/bot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-init-data': initData },
+      body: JSON.stringify({ outcome, difficulty })
+    }).then(() => setBotGameSaved(true)).catch(() => {})
+  }
+
+  // —————————————————————————————————————————————————————————————————————————————
+  // Calls /api/me — backend creates user row if first visit, returns profile if existing.
+  // Silent — user never sees a "sign up" screen.
   useEffect(() => {
     tg?.ready(); tg?.expand()
     fetch(API + '/api/me', { headers: { 'x-init-data': initData } })
@@ -858,7 +1021,7 @@ export default function App() {
         // Show phone modal if phone is not linked yet
         if (!data?.phone_number) setShowPhoneModal(true)
       })
-      .catch(() => {}) // Silent fail â€” app still works, just no balance shown
+      .catch(() => {}) // Silent fail — app still works, just no balance shown
   }, [])
 
   // â”€â”€â”€ Periodically fetch open matches for the lobby list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -905,34 +1068,6 @@ export default function App() {
 
     return () => clearTimeout(timer)
   }, [tick, screen, mode, gameOver, playerColor, difficulty])
-
-  function checkComputerGameOver(chess) {
-    if (!chess.isGameOver()) return
-    setGameOver(true)
-    let outcome = 'draw'
-    if (chess.isCheckmate()) {
-      const winner = chess.turn() === 'w' ? 'black' : 'white'
-      if (winner === playerColor) {
-        sfx().win(); setStatus('ðŸ† You win! Checkmate!')
-        outcome = 'win'
-      } else {
-        sfx().lose(); setStatus('ðŸ’€ Computer wins!')
-        outcome = 'loss'
-      }
-    } else {
-      sfx().draw()
-      setStatus('Â½ Draw!')
-    }
-    setGameOverOutcome(outcome)
-    setShowGameOverlay(true)
-    setBotGameSaved(false)
-    // Save bot game to history
-    fetch(API + '/api/history/bot', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-init-data': initData },
-      body: JSON.stringify({ outcome, difficulty })
-    }).then(() => setBotGameSaved(true)).catch(() => {})
-  }
 
 function startVsComputer() {
     chessRef.current = new Chess()
@@ -1267,6 +1402,9 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
           <div className="absolute -right-6 -top-6 w-28 h-28 bg-purple-500/10 rounded-full blur-2xl pointer-events-none"></div>
           <div className="absolute -left-6 -bottom-6 w-28 h-28 bg-blue-500/15 rounded-full blur-2xl pointer-events-none"></div>
 
+          <p className="text-[10px] uppercase font-bold tracking-widest text-purple-400/90 mb-1.5">
+            Hey, {userName.length > 12 ? userName.slice(0, 10) + '...' : userName}!
+          </p>
           <h1 className="text-3xl font-black tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-300 to-indigo-400 drop-shadow-[0_0_15px_rgba(168,85,247,0.7)]">
             CHESS ARENA
           </h1>
@@ -1313,7 +1451,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
                   : "bg-[#110924] border border-[#26184a] shadow-lg hover:border-purple-500/30"
               }`}
             >
-              <div className="w-11 h-11 mb-2 bg-gradient-to-b from-purple-500/15 to-transparent rounded-full flex items-center justify-center text-xl drop-shadow-[0_0_8px_rgba(168,85,247,0.3)]">âš”ï¸</div>
+              <div className="w-11 h-11 mb-2 bg-gradient-to-b from-purple-500/15 to-transparent rounded-full flex items-center justify-center text-xl drop-shadow-[0_0_8px_rgba(168,85,247,0.3)]">âš”ï¸ </div>
               <h3 className="font-black text-sm tracking-wide text-gray-200">VS HUMAN</h3>
               <p className="text-[10px] text-gray-500 mt-0.5">Online Mode</p>
             </div>
@@ -1330,7 +1468,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
                 mode === 'computer' ? 'opacity-40 cursor-not-allowed' : ''
               }`}
             >
-              ðŸª™ Play With Bet <span className={`text-[10px] inline-block transition-transform duration-200 ${betPanelOpen ? 'rotate-90' : ''}`}>â¯</span>
+              ðŸª™ Play With Bet <span className={`text-[10px] inline-block transition-transform duration-200 ${betPanelOpen ? 'rotate-90' : ''}`}>â ¯</span>
             </button>
 
             {/* Bet Panel */}
@@ -1452,6 +1590,44 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
             </div>
           )}
         </div>
+
+        {/* Available Lobbies */}
+        {mode === 'human' && (
+          <section className="space-y-2 pt-1">
+            <div className="relative flex items-center justify-between">
+              <span className="text-[10px] font-bold tracking-wider text-purple-400/80 uppercase">Available Lobbies</span>
+              <div className="flex-grow ml-3 border-t border-[#1f143d]"></div>
+            </div>
+            {openMatches.length === 0 ? (
+              <div className="bg-[#110924] border border-[#231644]/50 rounded-xl p-3.5 text-center text-[10px] text-gray-500 italic">
+                No active lobbies found. Create one!
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[140px] overflow-y-auto no-scrollbar">
+                {openMatches.map((m) => (
+                  <div 
+                    key={m.match_id}
+                    onClick={() => joinMatch(m.match_id)}
+                    className="bg-[#110924] border border-[#231644] hover:border-purple-500/40 p-3 rounded-xl flex items-center justify-between transition cursor-pointer active:scale-[0.98] duration-100 shadow-md"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs">⚔️</span>
+                      <div className="text-left">
+                        <p className="text-[11px] font-bold text-gray-200">Host: #{String(m.white_tg).slice(-5)}</p>
+                        <p className="text-[9px] text-gray-500">Waiting for player...</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">
+                        {m.stake === 0 ? 'FREE' : `$${m.stake} ${m.currency}`}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Divider */}
         <div className="relative flex items-center justify-center py-1">
@@ -1669,7 +1845,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
   function renderLobby() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-5 space-y-6 h-full bg-[#0a0516]">
-        <div className="text-5xl">âš”ï¸</div>
+        <div className="text-5xl">⚔️</div>
         <h2 className="font-black text-xl text-purple-400 tracking-wide">Match Created!</h2>
         <p className="text-gray-500 text-xs">Share this ID with your opponent</p>
 
@@ -1679,21 +1855,21 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
             {matchId}
           </div>
           <button 
-            onClick={() => { navigator.clipboard.writeText(matchId); setStatus('âœ… Copied!') }}
+            onClick={() => { navigator.clipboard.writeText(matchId); setStatus('✅ Copied!') }}
             className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold text-xs py-3 rounded-lg mt-2 shadow-md uppercase tracking-wider"
           >
-            ðŸ“‹ Copy Match ID
+            📋 Copy Match ID
           </button>
         </div>
 
-        <div className="text-gray-400 text-xs animate-pulse">â³ Waiting for opponent...</div>
+        <div className="text-gray-400 text-xs animate-pulse">⏳ Waiting for opponent...</div>
         {status && <div className="text-emerald-400 text-xs font-semibold">{status}</div>}
 
         <button 
           onClick={reset} 
           className="bg-transparent border border-gray-800 text-gray-500 hover:text-white px-8 py-3 rounded-xl font-bold text-xs tracking-wider transition uppercase"
         >
-          â† Cancel
+          ← Cancel
         </button>
       </div>
     )
@@ -1711,11 +1887,11 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         {/* Header */}
         <div className="flex justify-between items-center w-full">
           <div>
-            <div className="font-black text-sm text-purple-400 tracking-wide">â™Ÿ CHESS ARENA</div>
+            <div className="font-black text-sm text-purple-400 tracking-wide">♚ CHESS ARENA</div>
             <div className="text-gray-500 text-[10px]">
               {isBot
-                ? <>You play <strong className="text-indigo-300">{playerColor}</strong> Â· {difficulty}</>
-                : <>You are <strong className="text-indigo-300">{color}</strong> Â· {cfg.symbol}{stake} stake</>
+                ? <>You play <strong className="text-indigo-300">{playerColor}</strong> · {difficulty}</>
+                : <>You are <strong className="text-indigo-300">{color}</strong> · {cfg.symbol}{stake} stake</>
               }
             </div>
           </div>
@@ -1726,13 +1902,13 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
               ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400' 
               : 'bg-indigo-500/10 border-indigo-500/40 text-indigo-400'
           }`}>
-            {botThinking ? 'ðŸ¤– Thinking' : humanTurn ? 'âš¡ï¸ Your turn' : 'â³ Waiting'}
+            {botThinking ? '🤖 Thinking' : humanTurn ? '⚡️ Your turn' : '⏳ Waiting'}
           </div>
         </div>
 
         {/* Status Bar */}
         <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl py-2.5 px-4 text-center text-xs font-semibold text-indigo-300 w-full shadow-inner">
-          {status || 'â™Ÿ Game in progress'}
+          {status || '♚ Game in progress'}
         </div>
 
         {/* Custom Chessboard Container */}
@@ -1754,7 +1930,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         {/* Easy mode hints */}
         {showHints && humanTurn && !gameOver && (
           <div className="text-emerald-400 text-[10px] text-center font-bold tracking-wide animate-pulse">
-            ðŸ’¡ Tap any piece to see where it can move
+            💡 Tap any piece to see where it can move
           </div>
         )}
 
@@ -1791,27 +1967,37 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         {/* Control Buttons */}
         <div className="flex gap-2.5 w-full">
           {(result || gameOver) && (
-            <button 
-              onClick={isBot ? startVsComputer : reset}
-              className="flex-1 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white font-black text-xs py-3.5 rounded-xl uppercase tracking-wider shadow-lg transition"
-            >
-              ðŸ”„ Play Again
-            </button>
+            <>
+              {gameOver && !showGameOverlay && (
+                <button
+                  onClick={() => setShowGameOverlay(true)}
+                  className="bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 font-black text-xs px-4 py-3.5 rounded-xl uppercase tracking-wider transition active:scale-[0.97] duration-200 shadow-sm"
+                >
+                  🏆 Summary
+                </button>
+              )}
+              <button 
+                onClick={isBot ? startVsComputer : reset}
+                className="flex-1 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white font-black text-xs py-3.5 rounded-xl uppercase tracking-wider shadow-lg transition active:scale-[0.97] duration-200"
+              >
+                🔄 Play Again
+              </button>
+            </>
           )}
           <button 
             onClick={reset}
-            className={`py-3.5 rounded-xl font-black text-xs tracking-wider transition uppercase border border-gray-800 text-gray-500 hover:text-white ${
+            className={`py-3.5 rounded-xl font-black text-xs tracking-wider transition uppercase border border-gray-800 text-gray-500 hover:text-white active:scale-[0.97] duration-200 ${
               result || gameOver ? 'px-5' : 'flex-grow'
             }`}
           >
-            â† Home
+            ← Home
           </button>
         </div>
       </div>
     )
   }
 
-  // â”€â”€â”€ CONSOLIDATED RENDER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ————————————————————————————————————————————————————————————————————————————
   return (
     <div className="text-white flex justify-center items-center min-h-screen p-0 sm:p-4 bg-[#03010a] font-sans">
       <div className="w-full max-w-md bg-[#0a0516] h-screen sm:h-[850px] flex flex-col justify-between shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden border-x border-slate-900 sm:rounded-3xl">
@@ -1819,12 +2005,10 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         {/* Render header (present on home screen) */}
         {screen === 'home' && (
           <header className="px-4 pt-3 pb-2 bg-[#0e071f] flex justify-between items-center border-b border-[#1b1233] shrink-0 z-50">
-            <button onClick={reset} className="text-gray-400 hover:text-white transition">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
+            <div className="w-6" />
             <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => setScreen('home')}>
               <span className="font-bold text-base tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-purple-300">ChessGame</span>
-              <span className="text-lg drop-shadow-[0_0_6px_rgba(168,85,247,0.6)]">â™Ÿï¸</span>
+              <span className="text-lg drop-shadow-[0_0_6px_rgba(168,85,247,0.6)]">♚️</span>
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
             </div>
             <button onClick={() => { helpFromRef.current = screen; setScreen('help') }} className="text-gray-400 hover:text-white transition">
@@ -1847,26 +2031,125 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         {(screen === 'home' || screen === 'profile') && (
           <footer className="bg-[#0b0617] border-t border-[#231545] grid grid-cols-5 text-center py-3 text-gray-300 text-xs font-black shrink-0 z-40 shadow-[0_-8px_25px_rgba(139,92,246,0.15)]">
             <button onClick={() => setScreen('home')} className={`${screen === 'home' ? 'text-purple-200 drop-shadow-[0_0_12px_rgba(168,85,247,0.75)]' : 'hover:text-gray-150 transition duration-100'} flex flex-col items-center justify-center gap-1`}>
-              <span className="text-lg">ðŸ </span> 
+              <span className="text-lg">🏠</span> 
               <span>Home</span>
             </button>
             <button onClick={() => alert('Leaderboard is displayed below on the home page.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-150">
-              <span className="text-lg">ðŸ†</span>
+              <span className="text-lg">🏆</span>
               <span>Rank</span>
             </button>
             <button onClick={() => { setScreen('profile') }} className={`${screen === 'profile' ? 'text-purple-200 drop-shadow-[0_0_12px_rgba(168,85,247,0.75)]' : 'hover:text-gray-150 transition duration-100'} flex flex-col items-center justify-center gap-1`}>
-              <span className="text-lg">ðŸ“œ</span>
+              <span className="text-lg">📜</span>
               <span>History</span>
             </button>
-            <button onClick={() => alert('Support Chat coming soon.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100">
-              <span className="text-lg">ðŸ’¬</span>
+            <button onClick={() => alert('Support Chat coming soon.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-150">
+              <span className="text-lg">💬</span>
               <span>Chat</span>
             </button>
             <button onClick={() => setScreen('profile')} className={`hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100`}>
-              <span className="text-lg">ðŸ‘¤</span>
+              <span className="text-lg">👤</span>
               <span>Me</span>
             </button>
           </footer>
+        )}
+
+        {/* Game Over Overlay */}
+        {showGameOverlay && (
+          <div className="absolute inset-0 bg-[#06030c]/95 backdrop-blur-md flex flex-col justify-between p-6 z-[100] animate-fade-in text-center">
+            {/* Confetti on Win */}
+            {gameOverOutcome === 'win' && <Confetti />}
+
+            <div className="flex-1 flex flex-col justify-center items-center space-y-6 select-none z-10">
+              {/* Animated Icon/Emoji */}
+              <div className="relative">
+                {gameOverOutcome === 'win' ? (
+                  <div className="w-24 h-24 bg-gradient-to-b from-yellow-400/20 to-amber-500/5 border border-yellow-500/30 rounded-full flex items-center justify-center text-5xl shadow-[0_0_30px_rgba(234,179,8,0.2)] animate-bounce">
+                    🏆
+                  </div>
+                ) : gameOverOutcome === 'loss' ? (
+                  <div className="w-24 h-24 bg-gradient-to-b from-rose-500/20 to-red-600/5 border border-rose-500/30 rounded-full flex items-center justify-center text-5xl shadow-[0_0_30px_rgba(244,63,94,0.2)] animate-pulse">
+                    🤖
+                  </div>
+                ) : (
+                  <div className="w-24 h-24 bg-gradient-to-b from-indigo-500/20 to-blue-600/5 border border-indigo-500/30 rounded-full flex items-center justify-center text-5xl shadow-[0_0_30px_rgba(99,102,241,0.2)] animate-pulse">
+                    🤝
+                  </div>
+                )}
+              </div>
+
+              {/* Title Header with beautiful Text Gradients */}
+              <div className="space-y-2">
+                {gameOverOutcome === 'win' ? (
+                  <>
+                    <h2 className="text-3xl font-black tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 via-amber-400 to-amber-200 drop-shadow-[0_0_10px_rgba(234,179,8,0.3)] uppercase">
+                      YOU ARE A GENIUS!
+                    </h2>
+                    <p className="text-xs text-amber-300/80 font-bold tracking-widest uppercase">VICTORY IS YOURS</p>
+                  </>
+                ) : gameOverOutcome === 'loss' ? (
+                  <>
+                    <h2 className="text-3xl font-black tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-rose-400 via-red-500 to-pink-500 drop-shadow-[0_0_10px_rgba(244,63,94,0.3)] uppercase">
+                      BOT DEFEATED YOU
+                    </h2>
+                    <p className="text-xs text-rose-400/80 font-bold tracking-widest uppercase">BETTER LUCK NEXT TIME</p>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-3xl font-black tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 drop-shadow-[0_0_10px_rgba(99,102,241,0.3)] uppercase">
+                      IT'S A DRAW
+                    </h2>
+                    <p className="text-xs text-indigo-300/80 font-bold tracking-widest uppercase">WELL PLAYED FIGHT</p>
+                  </>
+                )}
+              </div>
+
+              {/* Bot Sarcasm / Speech Bubble */}
+              <div className="max-w-[280px] bg-[#140b2b]/80 border border-[#2e1d5a] rounded-2xl p-4 shadow-xl relative mt-2 text-left">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-[#140b2b] border-t border-l border-[#2e1d5a] rotate-45"></div>
+                <div className="flex items-start gap-2.5 z-10 relative">
+                  <span className="text-xl">💬</span>
+                  <p className="text-xs text-gray-300 font-medium italic leading-relaxed">
+                    "{overlayQuote || (gameOverOutcome === 'win' ? "Wow, you managed to beat me... for now." : "Resistance is futile, human!")}"
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="space-y-2.5 z-10">
+              <button
+                onClick={() => {
+                  setShowGameOverlay(false)
+                  if (isBot) {
+                    startVsComputer()
+                  } else {
+                    reset()
+                  }
+                }}
+                className="w-full bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white font-black text-sm py-4 rounded-xl uppercase tracking-wider shadow-[0_4px_20px_rgba(99,102,241,0.4)] active:scale-[0.98] transition duration-150"
+              >
+                🔄 Play Again
+              </button>
+              
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  onClick={() => setShowGameOverlay(false)}
+                  className="bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 font-black text-xs py-3.5 rounded-xl uppercase tracking-wider active:scale-[0.97] transition duration-150"
+                >
+                  👁️ View Board
+                </button>
+                <button
+                  onClick={() => {
+                    setShowGameOverlay(false)
+                    reset()
+                  }}
+                  className="bg-transparent border border-gray-800 text-gray-500 hover:text-white font-black text-xs py-3.5 rounded-xl uppercase tracking-wider active:scale-[0.97] transition duration-150"
+                >
+                  🚪 Exit
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
