@@ -78,14 +78,16 @@ async def get_my_profile(x_init_data: str = Header(default="test")):
     user_data = verify_telegram(x_init_data)
     tg_id     = int(user_data["id"])
     username  = user_data.get("username") or user_data.get("first_name") or f"user_{tg_id}"
+    first_name = user_data.get("first_name") or username
 
     # Create user on first visit
-    user = get_or_create_user(tg_id, username)
+    user = get_or_create_user(tg_id, username, first_name)
 
     return {
         "id":               user.id,
         "telegram_id":      tg_id,
         "username":         user.username,
+        "first_name":       getattr(user, "first_name", user.username),
         "playable_balance": float(user.playable_balance),
         "locked_balance":   float(user.locked_balance),
         "status":           user.status,
@@ -254,7 +256,7 @@ async def join_match(match_id: str, x_init_data: str = Header(default="test")):
 
     # 6. Lock escrow for BOTH players atomically
     try:
-        lock_escrow(match_id, game["white_tg"], tg_id, stake, game.get("currency", "USDT"))
+        lock_escrow(match_id, game["white_tg"], tg_id, stake)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -374,32 +376,34 @@ async def ws_game(ws: WebSocket, match_id: str, color: str):
     game["ws"][color] = ws
     game.setdefault("bad_move_count", {"white": 0, "black": 0})
 
-    # If both players are now connected, notify both of them!
-    if game["ws"]["white"] and game["ws"]["black"]:
-        for side in ("white", "black"):
-            side_ws = game["ws"][side]
-            if side_ws:
-                try:
-                    await side_ws.send_json({
-                        "type":  "connected",
-                        "color": side,
-                        "fen":   game["board"].fen(),
-                        "stake": game["stake"],
-                        "pool":  game["stake"] * 2,
-                        "turn":  "white" if game["board"].turn == chess.WHITE else "black",
-                    })
-                except Exception:
-                    pass
-    else:
-        # Otherwise, just notify the player who just connected
-        await ws.send_json({
-            "type":  "connected",
-            "color": color,
-            "fen":   game["board"].fen(),
-            "stake": game["stake"],
-            "pool":  game["stake"] * 2,
-            "turn":  "white" if game["board"].turn == chess.WHITE else "black",
-        })
+    opponent_color = "black" if color == "white" else "white"
+    opponent_ws = game["ws"].get(opponent_color)
+
+    # Send connected event to the newly connected player
+    await ws.send_json({
+        "type":  "connected",
+        "color": color,
+        "fen":   game["board"].fen(),
+        "stake": game["stake"],
+        "pool":  game["stake"] * 2,
+        "turn":  "white" if game["board"].turn == chess.WHITE else "black",
+        "opponent_connected": opponent_ws is not None
+    })
+
+    # Also notify the opponent if they are already connected!
+    if opponent_ws:
+        try:
+            await opponent_ws.send_json({
+                "type":  "connected",
+                "color": opponent_color,
+                "fen":   game["board"].fen(),
+                "stake": game["stake"],
+                "pool":  game["stake"] * 2,
+                "turn":  "white" if game["board"].turn == chess.WHITE else "black",
+                "opponent_connected": True
+            })
+        except Exception:
+            pass
 
     try:
         while True:
@@ -517,9 +521,14 @@ async def ws_game(ws: WebSocket, match_id: str, color: str):
                 return
 
     except WebSocketDisconnect:
-        game["ws"][color] = None
-        other = "black" if color == "white" else "white"
-        other_ws = game["ws"].get(other)
+        if match_id in active_games:
+            game = active_games[match_id]
+            game["ws"][color] = None
+            if game["status"] == "waiting" and color == "white":
+                active_games.pop(match_id, None)
+                return
+            other = "black" if color == "white" else "white"
+            other_ws = game["ws"].get(other)
 
         # Disconnected player forfeits if game was active
         if game["status"] == "active":
@@ -561,7 +570,7 @@ async def ws_queue(ws: WebSocket, stake: float, currency: str, init: str = "test
     # 2. Validate stake
     try:
         stake = float(stake)
-        if stake < 0 or stake > 1000:
+        if stake <= 0 or stake > 1000:
             raise ValueError()
     except Exception:
         await ws.send_json({"type": "error", "msg": "Invalid stake"})
@@ -620,7 +629,7 @@ async def ws_queue(ws: WebSocket, stake: float, currency: str, init: str = "test
 
             # Lock escrow for both
             try:
-                lock_escrow(match_id, opponent["telegram_id"], tg_id, stake, currency)
+                lock_escrow(match_id, opponent["telegram_id"], tg_id, stake)
             except Exception as ex:
                 active_games.pop(match_id, None)
                 err_msg = {"type": "error", "msg": f"Escrow failed: {str(ex)}"}

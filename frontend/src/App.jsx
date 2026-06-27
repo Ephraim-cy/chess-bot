@@ -129,6 +129,7 @@ function fetchAIMove(fen, difficulty) {
           return resolve(m.from + m.to + (m.promotion || ''))
         }
 
+        // Shuffle moves for variety before searching
         for (let i = moves.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [moves[i], moves[j]] = [moves[j], moves[i]]
@@ -153,11 +154,11 @@ function fetchAIMove(fen, difficulty) {
       } catch {
         resolve(null)
       }
-    }, 80)
+    }, 80) // 80ms delay â€” lets React render "thinking..." before engine starts
   })
 }
 
-// ———————————————————————————————————————————————————————————————————————————————————
+// â”€â”€â”€ SOUND ENGINE (Web Audio API â€” no libraries needed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const AudioCtx = window.AudioContext || window.webkitAudioContext
 function createSoundEngine() {
   let ctx = null
@@ -165,56 +166,16 @@ function createSoundEngine() {
   function getCtx() {
     if (!AudioCtx) return null
     if (!ctx) ctx = new AudioCtx()
+    // Resume if suspended (browser autoplay policy)
     if (ctx.state === 'suspended') ctx.resume()
     return ctx
-  }
-
-  function clap() {
-    const c = getCtx()
-    if (!c) return
-    const now = c.currentTime
-
-    const bufferSize = c.sampleRate * 0.4
-    const buffer = c.createBuffer(1, bufferSize, c.sampleRate)
-    const data = buffer.getChannelData(0)
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1
-    }
-
-    const filter = c.createBiquadFilter()
-    filter.type = 'bandpass'
-    filter.frequency.value = 1000
-    filter.Q.value = 1.5
-
-    const gainNode = c.createGain()
-    gainNode.gain.setValueAtTime(0, now)
-
-    gainNode.gain.linearRampToValueAtTime(0.15, now + 0.01)
-    gainNode.gain.linearRampToValueAtTime(0.02, now + 0.02)
-    
-    gainNode.gain.linearRampToValueAtTime(0.25, now + 0.03)
-    gainNode.gain.linearRampToValueAtTime(0.04, now + 0.04)
-
-    gainNode.gain.linearRampToValueAtTime(0.4, now + 0.05)
-    gainNode.gain.linearRampToValueAtTime(0.06, now + 0.06)
-
-    gainNode.gain.linearRampToValueAtTime(1.0, now + 0.07)
-    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.35)
-
-    const noiseSource = c.createBufferSource()
-    noiseSource.buffer = buffer
-    noiseSource.connect(filter)
-    filter.connect(gainNode)
-    gainNode.connect(c.destination)
-
-    noiseSource.start(now)
-    noiseSource.stop(now + 0.4)
-  }
+}
 
   function playTone({ type = 'sine', freq, freq2, duration, volume = 0.4, attack = 0.01, decay = 0.1, fadeStart, notes }) {
     const c = getCtx()
     const now = c.currentTime
 
+    // If notes array given, play each note sequentially
     if (notes) {
       notes.forEach(n => playTone(n))
       return
@@ -243,15 +204,18 @@ function createSoundEngine() {
   }
 
   return {
+    // Soft woody thud â€” piece placed on board
     move() {
       playTone({ type: 'triangle', freq: 180, freq2: 90, duration: 0.18, volume: 0.5, attack: 0.005 })
     },
 
+    // Harder crack â€” piece taken
     capture() {
       playTone({ type: 'sawtooth', freq: 260, freq2: 80, duration: 0.22, volume: 0.45, attack: 0.005 })
       setTimeout(() => playTone({ type: 'triangle', freq: 120, duration: 0.15, volume: 0.3 }), 60)
     },
 
+    // Tense two-tone pulse â€” king is in check
     check() {
       playTone({ notes: [
         { type: 'square', freq: 440, duration: 0.12, volume: 0.3, attack: 0.01 },
@@ -260,11 +224,13 @@ function createSoundEngine() {
       setTimeout(() => playTone({ type: 'square', freq: 554, duration: 0.14, volume: 0.3 }), 160)
     },
 
+    // Castling â€” double knock
     castle() {
       playTone({ type: 'triangle', freq: 200, freq2: 110, duration: 0.16, volume: 0.45, attack: 0.005 })
       setTimeout(() => playTone({ type: 'triangle', freq: 160, freq2: 90, duration: 0.16, volume: 0.35, attack: 0.005 }), 120)
     },
 
+    // Rising arpeggio â€” game start
     gameStart() {
       const notes = [261, 329, 392, 523]
       notes.forEach((f, i) => {
@@ -272,6 +238,7 @@ function createSoundEngine() {
       })
     },
 
+    // Triumphant fanfare â€” you win
     win() {
       const seq = [
         { freq: 392, dur: 120 }, { freq: 392, dur: 120 }, { freq: 392, dur: 120 },
@@ -282,17 +249,9 @@ function createSoundEngine() {
         setTimeout(() => playTone({ type: 'sine', freq, duration: dur / 1000 + 0.05, volume: 0.35, attack: 0.02 }), t)
         t += dur + 20
       })
-      setTimeout(() => {
-        clap()
-        setTimeout(() => clap(), 150)
-        setTimeout(() => clap(), 300)
-        setTimeout(() => clap(), 450)
-        setTimeout(() => clap(), 600)
-        setTimeout(() => clap(), 750)
-        setTimeout(() => clap(), 900)
-      }, 500)
     },
 
+    // Descending sad tones â€” you lose
     lose() {
       const seq = [{ freq: 330, dur: 200 }, { freq: 277, dur: 200 }, { freq: 220, dur: 400 }]
       let t = 0
@@ -303,25 +262,19 @@ function createSoundEngine() {
     },
 
     // Neutral chord â€” draw
-    // Neutral chord — draw
     draw() {
       playTone({ type: 'sine', freq: 330, duration: 0.5, volume: 0.25, attack: 0.04 })
       playTone({ type: 'sine', freq: 392, duration: 0.5, volume: 0.2,  attack: 0.04 })
     },
 
-    // Soft click — UI button press
+    // Soft click â€” UI button press
     click() {
       playTone({ type: 'sine', freq: 600, freq2: 400, duration: 0.08, volume: 0.2, attack: 0.005 })
-    },
-
-    // Expose clap synthesized sound
-    clap() {
-      clap()
     }
   }
 }
 
-// Single instance — created lazily on first user interaction
+// Single instance â€” created lazily on first user interaction
 let _sfx = null
 function sfx() {
   if (!_sfx) _sfx = createSoundEngine()
@@ -504,9 +457,18 @@ function ProfileScreen({ onBack }) {
   const total     = playable + locked
 
   // Derive win/loss/draw counts from transaction history (including bot matches)
-  const wins   = txns.filter(t => t.type === 'winnings' || t.type === 'bot_win').length
-  const losses = txns.filter(t => t.type === 'rake' || t.type === 'loss' || t.type === 'bot_loss').length
-  const totalGames = wins + losses
+  const wins   = txns.filter(t => t.type === 'winnings' || t.type === 'bot_win' || t.type === 'escrow_release').length
+  const losses = txns.filter(t => {
+    if (t.type === 'bot_loss' || t.type === 'loss') return true;
+    if (t.type === 'escrow_lock') {
+      const hasRelease = txns.some(ot => ot.match_id === t.match_id && ot.type === 'escrow_release');
+      const hasRefund  = txns.some(ot => ot.match_id === t.match_id && ot.type === 'refund');
+      return !hasRelease && !hasRefund;
+    }
+    return false;
+  }).length;
+  const draws = txns.filter(t => t.type === 'bot_draw' || t.type === 'refund').length;
+  const totalGames = wins + losses + draws;
 
   // Type â†’ display config
   function txMeta(type) {
@@ -812,42 +774,6 @@ const S = {
 }
 
 // â”€â”€â”€ MAIN APP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Confetti Component
-const Confetti = () => {
-  const pieces = useMemo(() => {
-    const colors = ['#f43f5e', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
-    return Array.from({ length: 45 }).map((_, i) => {
-      const size = Math.random() * 8 + 6;
-      const color = colors[Math.floor(Math.random() * colors.length)];
-      const left = Math.random() * 100;
-      const duration = Math.random() * 2.5 + 2.5;
-      const delay = Math.random() * 2.5;
-      const shapes = ['rounded-sm', 'rounded-full', 'rotate-45'];
-      const shape = shapes[Math.floor(Math.random() * shapes.length)];
-      return {
-        id: i,
-        style: {
-          left: `${left}%`,
-          width: `${size}px`,
-          height: `${size}px`,
-          backgroundColor: color,
-          animationDuration: `${duration}s`,
-          animationDelay: `${delay}s`,
-        },
-        className: `confetti-piece ${shape}`
-      };
-    });
-  }, []);
-
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none z-50">
-      {pieces.map(p => (
-        <div key={p.id} className={p.className} style={p.style} />
-      ))}
-    </div>
-  );
-};
-
 export default function App() {
   const [screen, setScreen]   = useState('home')
   const helpFromRef           = useRef('home')
@@ -1016,12 +942,13 @@ export default function App() {
         if (data?.balance?.playable !== undefined) {
           setUserBalance(data.balance.playable)
         }
-        if (data?.username) setUserName(data.username)
+        if (data?.first_name) setUserName(data.first_name)
+        else if (data?.username) setUserName(data.username)
         if (data?.id) setUserAccountId(data.id)
         // Show phone modal if phone is not linked yet
         if (!data?.phone_number) setShowPhoneModal(true)
       })
-      .catch(() => {}) // Silent fail — app still works, just no balance shown
+      .catch(() => {}) // Silent fail â€” app still works, just no balance shown
   }, [])
 
   // â”€â”€â”€ Periodically fetch open matches for the lobby list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1068,6 +995,34 @@ export default function App() {
 
     return () => clearTimeout(timer)
   }, [tick, screen, mode, gameOver, playerColor, difficulty])
+
+  function checkComputerGameOver(chess) {
+    if (!chess.isGameOver()) return
+    setGameOver(true)
+    let outcome = 'draw'
+    if (chess.isCheckmate()) {
+      const winner = chess.turn() === 'w' ? 'black' : 'white'
+      if (winner === playerColor) {
+        sfx().win(); setStatus('ðŸ† You win! Checkmate!')
+        outcome = 'win'
+      } else {
+        sfx().lose(); setStatus('ðŸ’€ Computer wins!')
+        outcome = 'loss'
+      }
+    } else {
+      sfx().draw()
+      setStatus('Â½ Draw!')
+    }
+    setGameOverOutcome(outcome)
+    setShowGameOverlay(true)
+    setBotGameSaved(false)
+    // Save bot game to history
+    fetch(API + '/api/history/bot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-init-data': initData },
+      body: JSON.stringify({ outcome, difficulty })
+    }).then(() => setBotGameSaved(true)).catch(() => {})
+  }
 
 function startVsComputer() {
     chessRef.current = new Chess()
@@ -1263,10 +1218,16 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
       const msg = JSON.parse(evt.data)
       const myClr = colorRef.current
       if (msg.type === 'connected') {
-        applyServerFen(msg.fen); setScreen('game')
+        applyServerFen(msg.fen)
         const mine = msg.turn === myClr
         setMyTurnUI(mine)
-        setStatus(mine ? 'âš¡ï¸ Your turn!' : 'â³ Waiting for opponent...')
+        if (clr === 'black' || msg.opponent_connected) {
+          setScreen('game')
+          setStatus(mine ? 'âš¡ï¸  Your turn!' : 'â ³ Waiting for opponent...')
+        } else {
+          setScreen('lobby')
+          setStatus('â ³ Waiting for opponent...')
+        }
         return
       }
       if (msg.type === 'state') {
@@ -1403,7 +1364,11 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
           <div className="absolute -left-6 -bottom-6 w-28 h-28 bg-blue-500/15 rounded-full blur-2xl pointer-events-none"></div>
 
           <p className="text-[10px] uppercase font-bold tracking-widest text-purple-400/90 mb-1.5">
-            Hey, {userName.length > 12 ? userName.slice(0, 10) + '...' : userName}!
+            Hey, {(() => {
+            let name = userName || '';
+            if (name.startsWith('@')) name = name.substring(1);
+            return name.length > 10 ? name.slice(0, 8) + '...' : name;
+          })()}!
           </p>
           <h1 className="text-3xl font-black tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-300 to-indigo-400 drop-shadow-[0_0_15px_rgba(168,85,247,0.7)]">
             CHESS ARENA
@@ -1845,7 +1810,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
   function renderLobby() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-5 space-y-6 h-full bg-[#0a0516]">
-        <div className="text-5xl">⚔️</div>
+        <div className="text-5xl">âš”ï¸</div>
         <h2 className="font-black text-xl text-purple-400 tracking-wide">Match Created!</h2>
         <p className="text-gray-500 text-xs">Share this ID with your opponent</p>
 
@@ -1855,21 +1820,21 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
             {matchId}
           </div>
           <button 
-            onClick={() => { navigator.clipboard.writeText(matchId); setStatus('✅ Copied!') }}
+            onClick={() => { navigator.clipboard.writeText(matchId); setStatus('âœ… Copied!') }}
             className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold text-xs py-3 rounded-lg mt-2 shadow-md uppercase tracking-wider"
           >
-            📋 Copy Match ID
+            ðŸ“‹ Copy Match ID
           </button>
         </div>
 
-        <div className="text-gray-400 text-xs animate-pulse">⏳ Waiting for opponent...</div>
+        <div className="text-gray-400 text-xs animate-pulse">â³ Waiting for opponent...</div>
         {status && <div className="text-emerald-400 text-xs font-semibold">{status}</div>}
 
         <button 
           onClick={reset} 
           className="bg-transparent border border-gray-800 text-gray-500 hover:text-white px-8 py-3 rounded-xl font-bold text-xs tracking-wider transition uppercase"
         >
-          ← Cancel
+          â† Cancel
         </button>
       </div>
     )
@@ -1887,11 +1852,11 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         {/* Header */}
         <div className="flex justify-between items-center w-full">
           <div>
-            <div className="font-black text-sm text-purple-400 tracking-wide">♚ CHESS ARENA</div>
+            <div className="font-black text-sm text-purple-400 tracking-wide">â™Ÿ CHESS ARENA</div>
             <div className="text-gray-500 text-[10px]">
               {isBot
-                ? <>You play <strong className="text-indigo-300">{playerColor}</strong> · {difficulty}</>
-                : <>You are <strong className="text-indigo-300">{color}</strong> · {cfg.symbol}{stake} stake</>
+                ? <>You play <strong className="text-indigo-300">{playerColor}</strong> Â· {difficulty}</>
+                : <>You are <strong className="text-indigo-300">{color}</strong> Â· {cfg.symbol}{stake} stake</>
               }
             </div>
           </div>
@@ -1902,13 +1867,13 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
               ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400' 
               : 'bg-indigo-500/10 border-indigo-500/40 text-indigo-400'
           }`}>
-            {botThinking ? '🤖 Thinking' : humanTurn ? '⚡️ Your turn' : '⏳ Waiting'}
+            {botThinking ? 'ðŸ¤– Thinking' : humanTurn ? 'âš¡ï¸ Your turn' : 'â³ Waiting'}
           </div>
         </div>
 
         {/* Status Bar */}
         <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl py-2.5 px-4 text-center text-xs font-semibold text-indigo-300 w-full shadow-inner">
-          {status || '♚ Game in progress'}
+          {status || 'â™Ÿ Game in progress'}
         </div>
 
         {/* Custom Chessboard Container */}
@@ -1930,7 +1895,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         {/* Easy mode hints */}
         {showHints && humanTurn && !gameOver && (
           <div className="text-emerald-400 text-[10px] text-center font-bold tracking-wide animate-pulse">
-            💡 Tap any piece to see where it can move
+            ðŸ’¡ Tap any piece to see where it can move
           </div>
         )}
 
@@ -1967,40 +1932,30 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         {/* Control Buttons */}
         <div className="flex gap-2.5 w-full">
           {(result || gameOver) && (
-            <>
-              {gameOver && !showGameOverlay && (
-                <button
-                  onClick={() => setShowGameOverlay(true)}
-                  className="bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 font-black text-xs px-4 py-3.5 rounded-xl uppercase tracking-wider transition active:scale-[0.97] duration-200 shadow-sm"
-                >
-                  🏆 Summary
-                </button>
-              )}
-              <button 
-                onClick={isBot ? startVsComputer : reset}
-                className="flex-1 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white font-black text-xs py-3.5 rounded-xl uppercase tracking-wider shadow-lg transition active:scale-[0.97] duration-200"
-              >
-                🔄 Play Again
-              </button>
-            </>
+            <button 
+              onClick={isBot ? startVsComputer : reset}
+              className="flex-1 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white font-black text-xs py-3.5 rounded-xl uppercase tracking-wider shadow-lg transition"
+            >
+              ðŸ”„ Play Again
+            </button>
           )}
           <button 
             onClick={reset}
-            className={`py-3.5 rounded-xl font-black text-xs tracking-wider transition uppercase border border-gray-800 text-gray-500 hover:text-white active:scale-[0.97] duration-200 ${
+            className={`py-3.5 rounded-xl font-black text-xs tracking-wider transition uppercase border border-gray-800 text-gray-500 hover:text-white ${
               result || gameOver ? 'px-5' : 'flex-grow'
             }`}
           >
-            ← Home
+            â† Home
           </button>
         </div>
       </div>
     )
   }
 
-  // ————————————————————————————————————————————————————————————————————————————
+  // â”€â”€â”€ CONSOLIDATED RENDER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
-    <div className="text-white flex justify-center items-center min-h-screen p-0 sm:p-4 bg-[#03010a] font-sans">
-      <div className="w-full max-w-md bg-[#0a0516] h-screen sm:h-[850px] flex flex-col justify-between shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden border-x border-slate-900 sm:rounded-3xl">
+    <div className="text-white flex justify-center items-center h-[100dvh] w-screen overflow-hidden bg-[#03010a] font-sans select-none touch-none">
+      <div className="w-full max-w-md bg-[#0a0516] h-full sm:h-[850px] flex flex-col justify-between shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden sm:border-x border-slate-900 sm:rounded-3xl">
         
         {/* Render header (present on home screen) */}
         {screen === 'home' && (
@@ -2008,7 +1963,7 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
             <div className="w-6" />
             <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => setScreen('home')}>
               <span className="font-bold text-base tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-purple-300">ChessGame</span>
-              <span className="text-lg drop-shadow-[0_0_6px_rgba(168,85,247,0.6)]">♚️</span>
+              <span className="text-lg drop-shadow-[0_0_6px_rgba(168,85,247,0.6)]">â™Ÿï¸</span>
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
             </div>
             <button onClick={() => { helpFromRef.current = screen; setScreen('help') }} className="text-gray-400 hover:text-white transition">
@@ -2031,125 +1986,26 @@ if (!move) { setSelectedSq(null); setLegalTargets([]); return }
         {(screen === 'home' || screen === 'profile') && (
           <footer className="bg-[#0b0617] border-t border-[#231545] grid grid-cols-5 text-center py-3 text-gray-300 text-xs font-black shrink-0 z-40 shadow-[0_-8px_25px_rgba(139,92,246,0.15)]">
             <button onClick={() => setScreen('home')} className={`${screen === 'home' ? 'text-purple-200 drop-shadow-[0_0_12px_rgba(168,85,247,0.75)]' : 'hover:text-gray-150 transition duration-100'} flex flex-col items-center justify-center gap-1`}>
-              <span className="text-lg">🏠</span> 
+              <span className="text-lg">ðŸ </span> 
               <span>Home</span>
             </button>
             <button onClick={() => alert('Leaderboard is displayed below on the home page.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-150">
-              <span className="text-lg">🏆</span>
+              <span className="text-lg">ðŸ†</span>
               <span>Rank</span>
             </button>
             <button onClick={() => { setScreen('profile') }} className={`${screen === 'profile' ? 'text-purple-200 drop-shadow-[0_0_12px_rgba(168,85,247,0.75)]' : 'hover:text-gray-150 transition duration-100'} flex flex-col items-center justify-center gap-1`}>
-              <span className="text-lg">📜</span>
+              <span className="text-lg">ðŸ“œ</span>
               <span>History</span>
             </button>
-            <button onClick={() => alert('Support Chat coming soon.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-150">
-              <span className="text-lg">💬</span>
+            <button onClick={() => alert('Support Chat coming soon.')} className="hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100">
+              <span className="text-lg">ðŸ’¬</span>
               <span>Chat</span>
             </button>
             <button onClick={() => setScreen('profile')} className={`hover:text-gray-150 flex flex-col items-center justify-center gap-1 transition duration-100`}>
-              <span className="text-lg">👤</span>
+              <span className="text-lg">ðŸ‘¤</span>
               <span>Me</span>
             </button>
           </footer>
-        )}
-
-        {/* Game Over Overlay */}
-        {showGameOverlay && (
-          <div className="absolute inset-0 bg-[#06030c]/95 backdrop-blur-md flex flex-col justify-between p-6 z-[100] animate-fade-in text-center">
-            {/* Confetti on Win */}
-            {gameOverOutcome === 'win' && <Confetti />}
-
-            <div className="flex-1 flex flex-col justify-center items-center space-y-6 select-none z-10">
-              {/* Animated Icon/Emoji */}
-              <div className="relative">
-                {gameOverOutcome === 'win' ? (
-                  <div className="w-24 h-24 bg-gradient-to-b from-yellow-400/20 to-amber-500/5 border border-yellow-500/30 rounded-full flex items-center justify-center text-5xl shadow-[0_0_30px_rgba(234,179,8,0.2)] animate-bounce">
-                    🏆
-                  </div>
-                ) : gameOverOutcome === 'loss' ? (
-                  <div className="w-24 h-24 bg-gradient-to-b from-rose-500/20 to-red-600/5 border border-rose-500/30 rounded-full flex items-center justify-center text-5xl shadow-[0_0_30px_rgba(244,63,94,0.2)] animate-pulse">
-                    🤖
-                  </div>
-                ) : (
-                  <div className="w-24 h-24 bg-gradient-to-b from-indigo-500/20 to-blue-600/5 border border-indigo-500/30 rounded-full flex items-center justify-center text-5xl shadow-[0_0_30px_rgba(99,102,241,0.2)] animate-pulse">
-                    🤝
-                  </div>
-                )}
-              </div>
-
-              {/* Title Header with beautiful Text Gradients */}
-              <div className="space-y-2">
-                {gameOverOutcome === 'win' ? (
-                  <>
-                    <h2 className="text-3xl font-black tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 via-amber-400 to-amber-200 drop-shadow-[0_0_10px_rgba(234,179,8,0.3)] uppercase">
-                      YOU ARE A GENIUS!
-                    </h2>
-                    <p className="text-xs text-amber-300/80 font-bold tracking-widest uppercase">VICTORY IS YOURS</p>
-                  </>
-                ) : gameOverOutcome === 'loss' ? (
-                  <>
-                    <h2 className="text-3xl font-black tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-rose-400 via-red-500 to-pink-500 drop-shadow-[0_0_10px_rgba(244,63,94,0.3)] uppercase">
-                      BOT DEFEATED YOU
-                    </h2>
-                    <p className="text-xs text-rose-400/80 font-bold tracking-widest uppercase">BETTER LUCK NEXT TIME</p>
-                  </>
-                ) : (
-                  <>
-                    <h2 className="text-3xl font-black tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 drop-shadow-[0_0_10px_rgba(99,102,241,0.3)] uppercase">
-                      IT'S A DRAW
-                    </h2>
-                    <p className="text-xs text-indigo-300/80 font-bold tracking-widest uppercase">WELL PLAYED FIGHT</p>
-                  </>
-                )}
-              </div>
-
-              {/* Bot Sarcasm / Speech Bubble */}
-              <div className="max-w-[280px] bg-[#140b2b]/80 border border-[#2e1d5a] rounded-2xl p-4 shadow-xl relative mt-2 text-left">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-[#140b2b] border-t border-l border-[#2e1d5a] rotate-45"></div>
-                <div className="flex items-start gap-2.5 z-10 relative">
-                  <span className="text-xl">💬</span>
-                  <p className="text-xs text-gray-300 font-medium italic leading-relaxed">
-                    "{overlayQuote || (gameOverOutcome === 'win' ? "Wow, you managed to beat me... for now." : "Resistance is futile, human!")}"
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div className="space-y-2.5 z-10">
-              <button
-                onClick={() => {
-                  setShowGameOverlay(false)
-                  if (isBot) {
-                    startVsComputer()
-                  } else {
-                    reset()
-                  }
-                }}
-                className="w-full bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white font-black text-sm py-4 rounded-xl uppercase tracking-wider shadow-[0_4px_20px_rgba(99,102,241,0.4)] active:scale-[0.98] transition duration-150"
-              >
-                🔄 Play Again
-              </button>
-              
-              <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  onClick={() => setShowGameOverlay(false)}
-                  className="bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 font-black text-xs py-3.5 rounded-xl uppercase tracking-wider active:scale-[0.97] transition duration-150"
-                >
-                  👁️ View Board
-                </button>
-                <button
-                  onClick={() => {
-                    setShowGameOverlay(false)
-                    reset()
-                  }}
-                  className="bg-transparent border border-gray-800 text-gray-500 hover:text-white font-black text-xs py-3.5 rounded-xl uppercase tracking-wider active:scale-[0.97] transition duration-150"
-                >
-                  🚪 Exit
-                </button>
-              </div>
-            </div>
-          </div>
         )}
       </div>
     </div>

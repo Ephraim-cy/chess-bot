@@ -121,8 +121,6 @@ def validate_stake(amount: float) -> float:
     if not isinstance(amount, (int, float)):
         raise HTTPException(400, "Stake must be a number")
     amount = round(float(amount), 6)
-    if amount == 0:
-        return amount
     if amount < MIN_STAKE:
         raise HTTPException(400, f"Minimum stake is ${MIN_STAKE} USDT")
     if amount > MAX_STAKE:
